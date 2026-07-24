@@ -61,7 +61,11 @@ function Logo() {
   return (
     <SiteLink to="/" className="site-logo">
       <img src="/jpcs-logo.png" width="48" height="48" alt="" />
-      <span><strong>Junior Philippine Computer Society</strong><small>SSCR Manila</small></span>
+      <span>
+        <strong className="logo-text-full">Junior Philippine Computer Society</strong>
+        <strong className="logo-text-short">JPCS</strong>
+        <small>SSCR Manila</small>
+      </span>
     </SiteLink>
   );
 }

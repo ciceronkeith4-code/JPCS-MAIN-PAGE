@@ -162,7 +162,11 @@ export function LandingFooter() {
           <div className="landing-footer__brand">
             <button onClick={() => scrollToLandingSection("#home")} className="landing-brand">
               <span className="landing-brand__mark" aria-hidden="true"><img src="/jpcs-logo.png" alt="" /></span>
-              <span><strong>Junior Philippine Computer Society</strong><small>SSCR Manila Chapter</small></span>
+              <span>
+                <strong className="logo-text-full">Junior Philippine Computer Society</strong>
+                <strong className="logo-text-short">JPCS</strong>
+                <small>SSCR Manila Chapter</small>
+              </span>
             </button>
             <p>Developing responsible, capable, and connected computing professionals.</p>
           </div>

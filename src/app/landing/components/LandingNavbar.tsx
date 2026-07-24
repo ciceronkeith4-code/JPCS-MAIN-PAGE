@@ -62,7 +62,8 @@ export function LandingNavbar() {
             <img src="/jpcs-logo.png" alt="" />
           </span>
           <span>
-            <strong>Junior Philippine Computer Society</strong>
+            <strong className="logo-text-full">Junior Philippine Computer Society</strong>
+            <strong className="logo-text-short">JPCS</strong>
             <small>SSCR Manila Chapter</small>
           </span>
         </button>
