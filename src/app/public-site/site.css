@@ -71,7 +71,7 @@ a:hover .site-rolling > span:last-child { transform: translateY(0); }
 .site-button--text { min-height: 40px; padding-inline: 0; color: var(--primary); }
 .public-site a:focus-visible, .public-site button:focus-visible { outline: 3px solid rgba(217,119,6,.55); outline-offset: 4px; }
 
-.site-mobile-menu { position: fixed; z-index: 200; inset: 0; min-height: 100dvh; background: var(--primary); color: #fff; padding: 1.25rem clamp(1.25rem, 5vw, 3rem) 2rem; display: grid; grid-template-rows: auto 1fr auto; }
+.site-mobile-menu { position: fixed; z-index: 1000; inset: 0; min-height: 100dvh; background: var(--primary); color: #fff; padding: 1.25rem clamp(1.25rem, 5vw, 3rem) 2rem; display: grid; grid-template-rows: auto 1fr auto; }
 .site-mobile-menu .site-logo strong, .site-mobile-menu .site-logo small { color: #fff; }
 .site-mobile-menu__top { display: flex; align-items: center; justify-content: space-between; }
 .site-mobile-menu__top button { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff; border-radius: 50%; }
