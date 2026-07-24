@@ -356,7 +356,7 @@ a:hover .site-rolling > span:last-child { transform: translateY(0); }
   .site-image-placeholder--wide { min-height: 300px; aspect-ratio: 4 / 3; }
   .site-feature-row, .site-feature-row.is-reversed, .site-community-group { grid-template-columns: 1fr; gap: 2.5rem; }
   .site-feature-row.is-reversed .site-feature-row__visual, .site-community-group.is-reversed .site-community-group__visual { order: 0; }
-  .site-feature-row .site-image-placeholder, .site-community-group .site-image-placeholder, .site-learning .site-image-placeholder, .site-story .site-image-placeholder { min-height: 350px; }
+  .site-feature-row .site-image-placeholder, .site-community-group .site-image-placeholder, .site-learning .site-image-placeholder, .site-story .site-image-placeholder { min-height: auto; aspect-ratio: 16 / 10; }
   .site-benefits__grid, .site-membership__grid, .site-audiences__grid, .site-community-overview__grid, .site-purpose-pair__grid { grid-template-columns: 1fr; }
   .site-benefit { padding: 2rem 0; border-right: 0; border-bottom: 1px solid rgba(139,30,36,.18); }
   .site-benefit:last-child { border-bottom: 0; }
