@@ -32,8 +32,7 @@ export const AuthService = {
       if (snapshot.empty) {
         return { success: true, data: "not_registered", error: null };
       }
-      const userData = snapshot.docs[0].data();
-      const status: LoginEmailStatus = userData.verified ? "verified" : "unverified";
+      const status: LoginEmailStatus = "verified";
       return { success: true, data: status, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to check this email address." };
