@@ -27,14 +27,16 @@ export const AuthService = {
     }
 
     try {
+      // Only check if the email is registered — do NOT rely on the Firestore
+      // 'verified' field (it can be stale from old Supabase migration data).
+      // The authoritative verified check happens inside login() using Firebase Auth.
       const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
         return { success: true, data: "not_registered", error: null };
       }
-      const userData = snapshot.docs[0].data();
-      const status: LoginEmailStatus = userData.verified ? "verified" : "unverified";
-      return { success: true, data: status, error: null };
+      // Email exists in DB — treat as verified here; real check is in login()
+      return { success: true, data: "verified", error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to check this email address." };
     }
@@ -48,31 +50,50 @@ export const AuthService = {
 
     try {
       const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-      const userId = credential.user.uid;
+      const firebaseUser = credential.user;
 
+      // ── Email verification gate (Firebase Auth is the authoritative source) ──
+      if (!firebaseUser.emailVerified) {
+        await firebaseSignOut(auth);
+        return {
+          success: false,
+          data: null,
+          error: "Your email is not verified yet. Please check your inbox and click the verification link before signing in.",
+        };
+      }
+
+      const userId = firebaseUser.uid;
       if (import.meta.env.DEV) console.debug("Authenticated user for profile load", { userId });
 
+      // Find profile by UID first, then fall back to email (handles migrated accounts)
+      let profile: User | null = null;
       const userRef = doc(db, "users", userId);
       const userSnap = await getDoc(userRef);
 
-      let profile: User;
-
-      if (!userSnap.exists()) {
-        // Create profile document if it does not exist yet
-        const newProfile: User = {
-          id: userId,
-          email: normalizedEmail,
-          full_name: String(credential.user.displayName || normalizedEmail),
-          student_number: "",
-          course: "BSIT",
-          year_level: "1",
-          role: "student",
-          verified: false,
-        };
-        await setDoc(userRef, newProfile);
-        profile = newProfile;
-      } else {
+      if (userSnap.exists()) {
         profile = { id: userId, ...userSnap.data() } as User;
+      } else {
+        // Migrated account: find by email and update document ID to Firebase UID
+        const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const oldData = snapshot.docs[0].data();
+          profile = { ...oldData, id: userId, verified: true } as User;
+          await setDoc(userRef, profile);
+        } else {
+          // No profile at all — create a minimal one
+          profile = {
+            id: userId,
+            email: normalizedEmail,
+            full_name: String(firebaseUser.displayName || normalizedEmail),
+            student_number: "",
+            course: "BSIT",
+            year_level: "1",
+            role: "student",
+            verified: true,
+          };
+          await setDoc(userRef, profile);
+        }
       }
 
       if (import.meta.env.DEV) console.debug("Profile loaded after sign-in", { profileId: profile.id });
