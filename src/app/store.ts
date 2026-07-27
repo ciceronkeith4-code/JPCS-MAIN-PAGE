@@ -495,7 +495,7 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
       }
     }
 
-    const newUser: User = { ...data, id: finalId, role: "student", verified: true };
+    const newUser: User = { ...data, id: finalId, role: "student", verified: false };
 
     // Save locally
     const currentUsers = loadCache<User[]>(KEYS.users, []);
