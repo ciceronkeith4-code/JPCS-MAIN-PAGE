@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Card, Button, Input, Select, PageHeader, Alert } from "../components/ui";
 import { StorageService } from "../services/storage.service";
 import { ProfileService } from "../services/profile.service";
-import { supabase } from "../supabase";
+import { auth } from "../../firebase/config";
+import {
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
 import type { User } from "../types";
 
 const COURSES = [
@@ -89,16 +94,21 @@ export function ProfilePage({ user, onUpdate }: { user: User; onUpdate: (u: User
     }
     setPwLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: pwForm.next });
-      if (error) {
-        setPwError(error.message);
-      } else {
-        setPwSuccess(true);
-        setPwForm({ current: "", next: "", confirm: "" });
-        setTimeout(() => setPwSuccess(false), 3000);
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || !firebaseUser.email) {
+        setPwError("You are not signed in. Please reload the page.");
+        return;
       }
+      // Re-authenticate with current password before updating
+      const credential = EmailAuthProvider.credential(firebaseUser.email, pwForm.current);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await updatePassword(firebaseUser, pwForm.next);
+      setPwSuccess(true);
+      setPwForm({ current: "", next: "", confirm: "" });
+      setTimeout(() => setPwSuccess(false), 3000);
     } catch (err: any) {
-      setPwError(err.message || "Failed to update password.");
+      const isWrongPassword = err?.code === "auth/wrong-password" || err?.code === "auth/invalid-credential";
+      setPwError(isWrongPassword ? "Incorrect current password." : (err?.message || "Failed to update password."));
     } finally {
       setPwLoading(false);
     }

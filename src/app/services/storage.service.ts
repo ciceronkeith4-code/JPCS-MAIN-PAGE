@@ -1,4 +1,5 @@
-import { supabase } from "../supabase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { storage } from "../../firebase/config";
 import type { ApiResponse } from "../config/app.config";
 import { APP_CONFIG } from "../config/app.config";
 
@@ -61,26 +62,11 @@ export const StorageService = {
       const filename = `avatars/${userId}/${variant}.webp`;
       if (import.meta.env.DEV) console.debug("Uploading profile image", { userId, path: filename });
 
-      const { data, error } = await supabase.storage
-        .from("officers")
-        .upload(filename, compressedBlob, {
-          cacheControl: "3600",
-          upsert: true,
-          contentType: "image/webp",
-        });
+      const storageRef = ref(storage, filename);
+      await uploadBytes(storageRef, compressedBlob, { contentType: "image/webp" });
+      const downloadUrl = await getDownloadURL(storageRef);
 
-      if (error) {
-        return { success: false, data: null, error: error.message };
-      }
-
-      const { data: publicUrlData } = supabase.storage
-        .from("officers")
-        .getPublicUrl(data.path);
-
-      if (publicUrlData?.publicUrl) {
-        return { success: true, data: `${publicUrlData.publicUrl}?v=${Date.now()}`, error: null };
-      }
-      return { success: false, data: null, error: "Failed to construct public URL." };
+      return { success: true, data: `${downloadUrl}?v=${Date.now()}`, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred during upload." };
     }
@@ -89,16 +75,30 @@ export const StorageService = {
   async deleteAvatar(pathOrUrl: string): Promise<ApiResponse<void>> {
     try {
       let filePath = pathOrUrl;
-      if (pathOrUrl.includes("/storage/v1/object/public/officers/")) {
+
+      // Handle Firebase Storage download URLs
+      if (pathOrUrl.startsWith("https://firebasestorage.googleapis.com")) {
+        const pathMatch = pathOrUrl.match(/\/o\/(.+?)(?:\?|$)/);
+        if (pathMatch) {
+          filePath = decodeURIComponent(pathMatch[1]);
+        }
+      } else if (pathOrUrl.includes("/storage/v1/object/public/officers/")) {
+        // Legacy Supabase URL — extract path
         filePath = pathOrUrl.split("/storage/v1/object/public/officers/").pop() || "";
       }
+
       filePath = filePath.split(/[?#]/, 1)[0];
+
       if (filePath && !filePath.startsWith("data:") && !filePath.startsWith("http")) {
-        const { error } = await supabase.storage.from("officers").remove([filePath]);
-        if (error) return { success: false, data: null, error: error.message };
+        const storageRef = ref(storage, filePath);
+        await deleteObject(storageRef);
       }
       return { success: true, data: null, error: null };
     } catch (err: any) {
+      // Treat "file not found" as success — already deleted
+      if (err?.code === "storage/object-not-found") {
+        return { success: true, data: null, error: null };
+      }
       return { success: false, data: null, error: err?.message || "An unexpected error occurred during storage deletion." };
     }
   }

@@ -1,17 +1,21 @@
-import { supabase } from "../supabase";
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { db } from "../../firebase/config";
 import type { ApiResponse } from "../config/app.config";
 import type { Announcement } from "../types";
 
 export const AnnouncementService = {
   async fetchAll(): Promise<ApiResponse<Announcement[]>> {
     try {
-      const { data, error } = await supabase
-        .from("announcements")
-        .select("*")
-        .order("publish_date", { ascending: false });
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data: data || [], error: null };
+      let snap;
+      try {
+        const q = query(collection(db, "announcements"), orderBy("publish_date", "desc"));
+        snap = await getDocs(q);
+      } catch {
+        // Fallback if Firestore index is not yet created
+        snap = await getDocs(collection(db, "announcements"));
+      }
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Announcement[];
+      return { success: true, data, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -19,14 +23,8 @@ export const AnnouncementService = {
 
   async add(ann: Announcement): Promise<ApiResponse<Announcement>> {
     try {
-      const { data, error } = await supabase
-        .from("announcements")
-        .insert(ann)
-        .select()
-        .maybeSingle();
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data, error: null };
+      await setDoc(doc(db, "announcements", ann.id), ann);
+      return { success: true, data: ann, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -34,15 +32,8 @@ export const AnnouncementService = {
 
   async update(id: string, data: Partial<Announcement>): Promise<ApiResponse<Announcement>> {
     try {
-      const { data: updated, error } = await supabase
-        .from("announcements")
-        .update(data)
-        .eq("id", id)
-        .select()
-        .maybeSingle();
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data: updated, error: null };
+      await updateDoc(doc(db, "announcements", id), data as Record<string, unknown>);
+      return { success: true, data: { id, ...data } as Announcement, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -50,8 +41,7 @@ export const AnnouncementService = {
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
-      const { error } = await supabase.from("announcements").delete().eq("id", id);
-      if (error) return { success: false, data: null, error: error.message };
+      await deleteDoc(doc(db, "announcements", id));
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };

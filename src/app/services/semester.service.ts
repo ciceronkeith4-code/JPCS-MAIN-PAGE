@@ -1,17 +1,20 @@
-import { supabase } from "../supabase";
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
+import { db } from "../../firebase/config";
 import type { ApiResponse } from "../config/app.config";
 import type { Semester } from "../types";
 
 export const SemesterService = {
   async fetchAll(userId?: string): Promise<ApiResponse<Semester[]>> {
     try {
-      let query = supabase.from("semesters").select("*");
+      let snap;
       if (userId) {
-        query = query.eq("user_id", userId);
+        const q = query(collection(db, "semesters"), where("user_id", "==", userId));
+        snap = await getDocs(q);
+      } else {
+        snap = await getDocs(collection(db, "semesters"));
       }
-      const { data, error } = await query;
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data: data || [], error: null };
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Semester[];
+      return { success: true, data, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -19,14 +22,9 @@ export const SemesterService = {
 
   async add(semester: Semester): Promise<ApiResponse<Semester>> {
     try {
-      const { data, error } = await supabase
-        .from("semesters")
-        .upsert(semester, { onConflict: "id", ignoreDuplicates: true })
-        .select()
-        .maybeSingle();
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data, error: null };
+      // setDoc with merge:true mirrors Supabase upsert(ignoreDuplicates:true)
+      await setDoc(doc(db, "semesters", semester.id), semester, { merge: true });
+      return { success: true, data: semester, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -34,8 +32,7 @@ export const SemesterService = {
 
   async update(id: string, data: Partial<Semester>): Promise<ApiResponse<void>> {
     try {
-      const { error } = await supabase.from("semesters").update(data).eq("id", id);
-      if (error) return { success: false, data: null, error: error.message };
+      await updateDoc(doc(db, "semesters", id), data as Record<string, unknown>);
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
@@ -44,8 +41,7 @@ export const SemesterService = {
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
-      const { error } = await supabase.from("semesters").delete().eq("id", id);
-      if (error) return { success: false, data: null, error: error.message };
+      await deleteDoc(doc(db, "semesters", id));
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };

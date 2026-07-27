@@ -4,6 +4,7 @@ export type Feature = { eyebrow: string; title: string; description: string; det
 export const navigation: SiteRoute[] = [
   { label: "Home", to: "/" },
   { label: "About Us", to: "/about" },
+  { label: "Testimonial", to: "/testimonials" },
   { label: "Contacts", to: "/about#contact" },
 ];
 
@@ -28,7 +29,7 @@ export const benefits = [
 
 export const memberships = [
   { label: "For computing students", title: "Student member", note: "Membership details available upon registration.", items: ["Chapter activities", "Programming workshops", "Technical seminars", "Community channels", "Member resources", "Competition opportunities"], action: "Become a member", to: "/register" },
-  { label: "For organizations and professionals", title: "Partner or sponsor", note: "Contact us to shape a partnership around shared goals.", items: ["Event partnerships", "Community visibility", "Talent connections", "Technical mentorship", "Recruitment opportunities", "Institutional support"], action: "Partner with JPCS", to: "/about#contact" },
+  { label: "For organizations and professionals", title: "Industry & Government Partner", note: "Collaborate with us to drive innovation across public and private sectors.", items: ["IT industry linkages", "Government sector collaborations", "Joint development projects", "Talent & hiring pipelines", "Technical consultations", "Community outreach"], action: "Build a Partnership", to: "/about#contact" },
 ];
 
 export const programFeatures: Feature[] = [
@@ -49,29 +50,72 @@ export const audienceBenefits = [
 export const communityAudiences = [
   { eyebrow: "Students", title: "Learn, collaborate, and build with confidence.", description: "A welcoming place to practice, ask better questions, find collaborators, and prepare for the opportunities ahead.", items: ["Technical workshops", "Student project support", "Competitions", "Study and peer communities", "Career preparation", "Learning resources"], imageLabel: "Students collaborating image", imageFile: "community-students.webp" },
   { eyebrow: "Officers", title: "Lead programs that create meaningful student experiences.", description: "Chapter leadership gives students a real setting for serving others while developing judgment, systems thinking, and accountability.", items: ["Event planning", "Team coordination", "Project management", "Communication", "Partnership development", "Leadership mentoring"], imageLabel: "Officers planning an event image", imageFile: "community-officers.webp" },
-  { eyebrow: "Partners and alumni", title: "Share knowledge and help shape future technology professionals.", description: "Professionals and graduates bring context, encouragement, and opportunity into a student community eager to learn.", items: ["Guest speaking", "Mentorship", "Event sponsorship", "Internship opportunities", "Industry collaboration", "Alumni engagement"], imageLabel: "Alumni mentoring students image", imageFile: "community-partners.webp" },
+  { eyebrow: "Partners and alumni", title: "Strong alliances in IT industry and Government sectors.", description: "Forging valuable bridges with IT industry giants and government agencies to support digital transformation, career pipelines, and tech service programs.", items: ["IT Industry collaborations", "Government sector partnerships", "Student internships", "Project sponsorships", "Technical advisory", "Alumni engagement"], imageLabel: "Alumni and partner collaboration image", imageFile: "community-partners.webp" },
 ];
 
 export const values: Feature[] = [
   { eyebrow: "Practice", title: "Developing capable professionals", description: "Students deserve opportunities to transform technical knowledge into practical ability.", details: ["Curiosity made useful", "Strong foundations", "Responsible technical practice"], imageLabel: "Students presenting a technical project image", imageFile: "about-capability.webp" },
   { eyebrow: "Responsibility", title: "Supporting student leaders", description: "Leadership should be learned through service, responsibility, and meaningful experience.", details: ["Listen before leading", "Own the outcome", "Make space for others"], imageLabel: "Student leader facilitating a meeting image", imageFile: "about-leadership.webp" },
   { eyebrow: "Belonging", title: "Creating inclusive communities", description: "Every computing student should feel welcome, supported, and encouraged to participate.", details: ["Welcoming entry points", "Peer support", "Shared success"], imageLabel: "Inclusive student community image", imageFile: "about-community.webp" },
-  { eyebrow: "Connection", title: "Connecting education and industry", description: "Professional relationships help students understand how their abilities apply beyond the classroom.", details: ["Career context", "Honest mentorship", "Mutual learning"], imageLabel: "Industry guest speaking with students image", imageFile: "about-industry.webp" },
+  { eyebrow: "Connection", title: "Industry & Government Alliance", description: "Building strong partnerships in the IT industry and government sector to expand student horizons, opportunities, and public-sector tech initiatives.", details: ["IT industry mentorship", "Government sector integration", "Joint tech initiatives"], imageLabel: "Industry and government collaboration image", imageFile: "about-industry.webp" },
   { eyebrow: "Service", title: "Serving through technology", description: "Technology is most meaningful when it improves communities and creates opportunities.", details: ["Human-centered solutions", "Community partnership", "Ethical contribution"], imageLabel: "Technology community outreach image", imageFile: "about-service.webp" },
 ];
 
 export const officers = [
-  { name: "Name to be confirmed", role: "President", course: "Course · Year to be confirmed", responsibility: "Sets the chapter direction and supports every team." },
-  { name: "Name to be confirmed", role: "Vice President", course: "Course · Year to be confirmed", responsibility: "Coordinates programs and strengthens officer collaboration." },
-  { name: "Name to be confirmed", role: "Secretary", course: "Course · Year to be confirmed", responsibility: "Keeps chapter communication and records dependable." },
-  { name: "Name to be confirmed", role: "Treasurer", course: "Course · Year to be confirmed", responsibility: "Stewards chapter resources with clarity and care." },
-  { name: "Names to be confirmed", role: "Committee Heads", course: "Courses · Years to be confirmed", responsibility: "Lead technical, creative, membership, and outreach work." },
-  { name: "Name to be confirmed", role: "Faculty Adviser", course: "Official details to be confirmed", responsibility: "Guides the chapter with institutional and professional insight." },
+  { name: "Keith Ciceron", role: "President", course: "BSIT · 4th Year", responsibility: "Sets the department direction, leads student initiatives, and supports every team." },
+  { name: "Karl Tristan", role: "Vice President", course: "BSIT · 4th Year", responsibility: "Coordinates academic programs and strengthens internal officer collaboration." },
+  { name: "Andrei Baguisa", role: "Secretary", course: "BSIT · 3rd Year", responsibility: "Keeps department communications, schedules, and official records dependable." },
+  { name: "Kenneth Gregorio", role: "Treasurer", course: "BSIT · 3rd Year", responsibility: "Stewards department funds, budget planning, and resources with clarity and care." },
+  { name: "Khemuel Timkang", role: "Auditor", course: "BSIT · 3rd Year", responsibility: "Maintains transparency and conducts audits for all department activities." },
+  { name: "Von Dimaculangan", role: "P.R.O.", course: "BSIT · 3rd Year", responsibility: "Manages public relations, announcements, and external communications." },
+  { name: "John Carl Arche", role: "Technical Head", course: "BSIT · 3rd Year", responsibility: "Directs technical workshops, hands-on bootcamps, and developer support." },
+  { name: "Lance Alvarez Ceasar", role: "Content Manager", course: "BSIT · 2nd Year", responsibility: "Curates, edits, and designs creative digital media content for the department." },
+  { name: "JD Pagkatipunan", role: "Head of Sports", course: "BSIT · 3rd Year", responsibility: "Organizes sports fests, computing e-sports, and physical fitness activities." },
+  { name: "Lucian Corvinus", role: "4th Yr Representative", course: "BSIT · 4th Year", responsibility: "Represents the senior class, assisting fourth-year students with graduation requirements." },
+  { name: "Kenneth Fernandez", role: "3rd Yr Representative", course: "BSIT · 3rd Year", responsibility: "Coordinates with third-year class sections for department events and workshops." },
+  { name: "Ruth Geras", role: "2nd Yr Representative", course: "BSIT · 2nd Year", responsibility: "Coordinates with second-year class sections and supports peer learning circles." },
+  { name: "Jam Morales", role: "1st Yr Representative", course: "BSIT · 1st Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community." },
 ];
 
 export const seo = {
-  home: { title: "JPCS–SSCR Manila | Empowering Future Computing Professionals", description: "JPCS–SSCR Manila is a student-led community for technical learning, leadership, innovation, professional connection, and service.", path: "/" },
-  programs: { title: "Programs | JPCS–SSCR Manila", description: "Explore programming workshops, seminars, competitions, research, leadership, and networking programs from JPCS–SSCR Manila.", path: "/programs" },
-  community: { title: "Community | JPCS–SSCR Manila", description: "Discover how JPCS connects students, officers, educators, alumni, and technology partners through shared learning and service.", path: "/community" },
-  about: { title: "About | JPCS–SSCR Manila", description: "Learn why JPCS–SSCR Manila exists and how the chapter develops capable, ethical, innovative, service-oriented computing professionals.", path: "/about" },
+  home: { title: "IT DEPARTMENT OF SSCR MANILA | Empowering Future Computing Professionals", description: "IT DEPARTMENT OF SSCR MANILA is a student-led community for technical learning, leadership, innovation, professional connection, and service.", path: "/" },
+  programs: { title: "Programs | IT DEPARTMENT OF SSCR MANILA", description: "Explore programming workshops, seminars, competitions, research, leadership, and networking programs from the IT DEPARTMENT OF SSCR MANILA.", path: "/programs" },
+  community: { title: "Community | IT DEPARTMENT OF SSCR MANILA", description: "Discover how the IT Department connects students, officers, educators, alumni, and technology partners through shared learning and service.", path: "/community" },
+  about: { title: "About | IT DEPARTMENT OF SSCR MANILA", description: "Learn why the IT Department of SSCR Manila exists and how it develops capable, ethical, innovative, service-oriented computing professionals.", path: "/about" },
+  testimonials: { title: "Testimonials | IT DEPARTMENT OF SSCR MANILA", description: "Read inspiring stories and experiences from the IT DEPARTMENT OF SSCR MANILA alumni and student leaders.", path: "/testimonials" },
 };
+
+export type Testimonial = {
+  name: string;
+  role: string;
+  quote: string;
+  imageFile: string;
+};
+
+export const alumniTestimonials: Testimonial[] = [
+  {
+    name: "Keith Ciceron",
+    role: "Former IT Department | SSCR MANILA President (2023-2024)",
+    quote: "Serving as President of the IT Department student community was one of the most defining moments of my student years. It wasn't just about leading events, but witnessing how a passionate community of computing students can come together, share knowledge, and lift each other up. The technical workshops and network we established paved the way for my transition into the tech industry.",
+    imageFile: "/officers/keith_profile.png"
+  },
+  {
+    name: "Mark Diaz",
+    role: "Former IT Department | SSCR MANILA Vice President (2022-2023)",
+    quote: "The IT Department provided the bridge between theoretical classroom education and practical real-world skills. Through organizing hackathons and coordinating with industry partners, I gained technical and project management capabilities that you simply cannot learn from textbooks alone. I'm proud to see the community continue this legacy.",
+    imageFile: "/officers/mark_profile.png"
+  },
+  {
+    name: "Patricia Santos",
+    role: "Former IT Department | SSCR MANILA Secretary (2021-2022)",
+    quote: "What I loved most about the IT Department community was the inclusive learning culture. We started peer mentorship groups where senior students guided freshmen through tough programming concepts. Being part of this leadership circle built my communication skills and confidence, which are crucial in my current role as a Software Engineer.",
+    imageFile: "/images/about-leadership.webp"
+  },
+  {
+    name: "John Christian Ramos",
+    role: "Former IT Department | SSCR MANILA Tech Lead (2022-2024)",
+    quote: "We spent countless nights preparing hands-on programming bootcamps and tech seminars. The IT Department gave me a sandbox to build projects, try new technologies, and teach others. The experience of designing curriculum for workshops set a strong foundation for my career in Cloud Architecture.",
+    imageFile: "/images/about-capability.webp"
+  }
+];
+

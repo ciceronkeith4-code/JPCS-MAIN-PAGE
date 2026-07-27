@@ -1,4 +1,16 @@
-import { supabase } from "../supabase";
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  setDoc,
+  onSnapshot,
+  query,
+  orderBy,
+} from "firebase/firestore";
+import { auth, db } from "../../firebase/config";
 import type { ApiResponse } from "../config/app.config";
 import type { User } from "../types";
 
@@ -14,10 +26,17 @@ function debug(message: string, data: Record<string, unknown>) {
 export const ProfileService = {
   async fetchAll(): Promise<ApiResponse<User[]>> {
     try {
-      const { data, error } = await supabase.from(PROFILE_TABLE).select("*").order("created_at", { ascending: false });
-      if (error) return { success: false, data: null, error: error.message };
-      debug("Admin profile list loaded", { count: data?.length ?? 0 });
-      return { success: true, data: data || [], error: null };
+      let snap;
+      try {
+        const q = query(collection(db, PROFILE_TABLE), orderBy("created_at", "desc"));
+        snap = await getDocs(q);
+      } catch {
+        // Fallback if index not yet created
+        snap = await getDocs(collection(db, PROFILE_TABLE));
+      }
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as User[];
+      debug("Admin profile list loaded", { count: data.length });
+      return { success: true, data, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to load profiles." };
     }
@@ -25,8 +44,9 @@ export const ProfileService = {
 
   async fetchById(id: string): Promise<ApiResponse<User>> {
     try {
-      const { data, error } = await supabase.from(PROFILE_TABLE).select("*").eq("id", id).maybeSingle();
-      if (error || !data) return { success: false, data: null, error: error?.message || "Profile not found." };
+      const snap = await getDoc(doc(db, PROFILE_TABLE, id));
+      if (!snap.exists()) return { success: false, data: null, error: "Profile not found." };
+      const data = { id: snap.id, ...snap.data() } as User;
       debug("Profile row loaded", { profileId: data.id });
       return { success: true, data, error: null };
     } catch (err: any) {
@@ -35,15 +55,15 @@ export const ProfileService = {
   },
 
   async fetchCurrent(): Promise<ApiResponse<User>> {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) return { success: false, data: null, error: userError?.message || "No authenticated user found." };
-    debug("Fetching current profile", { userId: user.id });
-    return this.fetchById(user.id);
+    const user = auth.currentUser;
+    if (!user) return { success: false, data: null, error: "No authenticated user found." };
+    debug("Fetching current profile", { userId: user.uid });
+    return this.fetchById(user.uid);
   },
 
   async updateCurrent(changes: StudentProfileUpdate): Promise<ApiResponse<User>> {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) return { success: false, data: null, error: userError?.message || "No authenticated user found." };
+    const user = auth.currentUser;
+    if (!user) return { success: false, data: null, error: "No authenticated user found." };
 
     const payload: StudentProfileUpdate = {
       full_name: changes.full_name.trim(),
@@ -52,31 +72,28 @@ export const ProfileService = {
       year_level: changes.year_level,
       ...(changes.profile_photo === undefined ? {} : { profile_photo: changes.profile_photo }),
     };
-    debug("Submitting student profile update", { userId: user.id, fields: Object.keys(payload) });
+    debug("Submitting student profile update", { userId: user.uid, fields: Object.keys(payload) });
 
-    const { data, error } = await supabase
-      .from(PROFILE_TABLE)
-      .update({ ...payload, updated_at: new Date().toISOString() })
-      .eq("id", user.id)
-      .select()
-      .single();
-
-    if (error || !data) return { success: false, data: null, error: error?.message || "Profile update did not affect exactly one row." };
-    debug("Student profile update completed", { profileId: data.id });
-    return { success: true, data, error: null };
+    try {
+      const userRef = doc(db, PROFILE_TABLE, user.uid);
+      await updateDoc(userRef, { ...payload, updated_at: new Date().toISOString() });
+      const snap = await getDoc(userRef);
+      const data = { id: snap.id, ...snap.data() } as User;
+      debug("Student profile update completed", { profileId: data.id });
+      return { success: true, data, error: null };
+    } catch (err: any) {
+      return { success: false, data: null, error: err?.message || "Profile update failed." };
+    }
   },
 
-  // Compatibility for legacy callers. New student and admin flows use the
-  // explicit updateCurrent and updateForAdmin methods above.
+  // Compatibility for legacy callers.
   async update(id: string, changes: Partial<User>): Promise<ApiResponse<User>> {
     try {
-      const { data, error } = await supabase
-        .from(PROFILE_TABLE)
-        .update({ ...changes, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single();
-      if (error || !data) return { success: false, data: null, error: error?.message || "Profile update did not affect exactly one row." };
+      const userRef = doc(db, PROFILE_TABLE, id);
+      await updateDoc(userRef, { ...changes, updated_at: new Date().toISOString() });
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) return { success: false, data: null, error: "Profile not found after update." };
+      const data = { id: snap.id, ...snap.data() } as User;
       return { success: true, data, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to update profile." };
@@ -85,37 +102,44 @@ export const ProfileService = {
 
   async updateForAdmin(targetUserId: string, changes: AdminProfileUpdate): Promise<ApiResponse<User>> {
     debug("Submitting admin profile update", { targetUserId, fields: Object.keys(changes) });
-    const { data, error } = await supabase.rpc("admin_update_profile", {
-      target_user_id: targetUserId,
-      profile_changes: changes,
-    });
-
-    if (error || !data) return { success: false, data: null, error: error?.message || "Admin profile update did not affect exactly one row." };
-    debug("Admin profile update completed", { profileId: data.id });
-    return { success: true, data: data as User, error: null };
+    try {
+      const userRef = doc(db, PROFILE_TABLE, targetUserId);
+      await updateDoc(userRef, { ...changes, updated_at: new Date().toISOString() });
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) return { success: false, data: null, error: "Profile not found after admin update." };
+      const data = { id: snap.id, ...snap.data() } as User;
+      debug("Admin profile update completed", { profileId: data.id });
+      return { success: true, data, error: null };
+    } catch (err: any) {
+      return { success: false, data: null, error: err?.message || "Admin profile update failed." };
+    }
   },
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
-      const { error } = await supabase.from(PROFILE_TABLE).delete().eq("id", id);
-      if (error) return { success: false, data: null, error: error.message };
+      await deleteDoc(doc(db, PROFILE_TABLE, id));
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to delete profile." };
     }
   },
 
-  subscribeToCurrent(userId: string, onUpdate: (profile: User) => void) {
-    return supabase
-      .channel(`profile-${userId}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: PROFILE_TABLE, filter: `id=eq.${userId}` }, (payload) => onUpdate(payload.new as User))
-      .subscribe();
+  // Returns an unsubscribe function (replaces Supabase channel)
+  subscribeToCurrent(userId: string, onUpdate: (profile: User) => void): () => void {
+    return onSnapshot(doc(db, PROFILE_TABLE, userId), (snap) => {
+      if (snap.exists()) {
+        onUpdate({ id: snap.id, ...snap.data() } as User);
+      }
+    });
   },
 
-  subscribeToAll(onUpdate: (profile: User) => void) {
-    return supabase
-      .channel("admin-profile-updates")
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: PROFILE_TABLE }, (payload) => onUpdate(payload.new as User))
-      .subscribe();
+  subscribeToAll(onUpdate: (profile: User) => void): () => void {
+    return onSnapshot(collection(db, PROFILE_TABLE), (snap) => {
+      snap.docChanges().forEach((change) => {
+        if (change.type === "modified") {
+          onUpdate({ id: change.doc.id, ...change.doc.data() } as User);
+        }
+      });
+    });
   },
 };

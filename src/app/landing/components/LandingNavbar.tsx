@@ -57,14 +57,15 @@ export function LandingNavbar() {
   return (
     <header className={`landing-nav${scrolled ? " landing-nav--scrolled" : ""}`}>
       <div className="landing-shell landing-nav__inner">
-        <button className="landing-brand" onClick={() => navigate("#home")} aria-label="Junior Philippine Computer Society home">
-          <span className="landing-brand__mark" aria-hidden="true">
-            <img src="/jpcs-logo.png" alt="" />
+        <button className="landing-brand" onClick={() => navigate("#home")} aria-label="IT Department of SSCR Manila home">
+          <span className="landing-brand__mark" aria-hidden="true" style={{ display: "flex", gap: "8px" }}>
+            <img src="/sscr-logo.png" alt="SSCR Logo" style={{ width: "42px", height: "42px", objectFit: "contain" }} />
+            <img src="/jpcs-logo.png" alt="JPCS Logo" style={{ width: "42px", height: "42px", objectFit: "contain" }} />
           </span>
           <span>
-            <strong className="logo-text-full">Junior Philippine Computer Society</strong>
+            <strong className="logo-text-full">IT DEPARTMENT OF SSCR MANILA</strong>
             <strong className="logo-text-short">JPCS</strong>
-            <small>SSCR Manila Chapter</small>
+            <small>JPCS | SSCR MANILA CHAPTER</small>
           </span>
         </button>
 

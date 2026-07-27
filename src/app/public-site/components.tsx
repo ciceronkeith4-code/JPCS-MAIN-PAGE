@@ -60,11 +60,12 @@ export function AnimatedButton({ to, children, variant = "primary", className = 
 function Logo() {
   return (
     <SiteLink to="/" className="site-logo">
-      <img src="/jpcs-logo.png" width="48" height="48" alt="" />
+      <img src="/sscr-logo.png" width="48" height="48" alt="SSCR Logo" />
+      <img src="/jpcs-logo.png" width="48" height="48" alt="JPCS Logo" />
       <span>
-        <strong className="logo-text-full">Junior Philippine Computer Society</strong>
+        <strong className="logo-text-full">IT DEPARTMENT OF SSCR MANILA</strong>
         <strong className="logo-text-short">JPCS</strong>
-        <small>SSCR Manila</small>
+        <small>JPCS | SSCR MANILA CHAPTER</small>
       </span>
     </SiteLink>
   );
@@ -220,9 +221,81 @@ export function Footer() {
   );
 }
 
+export function IntroPreloader({ onComplete }: { onComplete: () => void }) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const duration = 5000; // 5 seconds loading duration
+    const intervalTime = 20;
+    const step = 100 / (duration / intervalTime);
+
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(timer);
+          setTimeout(onComplete, 180);
+          return 100;
+        }
+        return prev + step;
+      });
+    }, intervalTime);
+
+    return () => clearInterval(timer);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      className="site-intro-overlay"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="site-intro-content">
+        <motion.div
+          className="site-intro-line"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+        />
+        <motion.div
+          className="site-intro-logos"
+          initial={{ opacity: 0, scale: 0.85, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          style={{ display: "flex", gap: "16px", marginBlock: "2rem 1.5rem" }}
+        >
+          <img src="/sscr-logo.png" alt="SSCR Logo" style={{ width: "80px", height: "80px", objectFit: "contain" }} />
+          <img src="/jpcs-logo.png" alt="JPCS Logo" style={{ width: "80px", height: "80px", objectFit: "contain" }} />
+        </motion.div>
+        <motion.div
+          className="site-intro-titles"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <h2>IT Department of SSCR Manila</h2>
+          <p>JPCS | SSCR Manila Chapter</p>
+        </motion.div>
+        <div className="site-intro-progress">
+          <div className="site-intro-progress-bar" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <button className="site-intro-skip" type="button" onClick={onComplete}>
+        Skip Intro →
+      </button>
+    </motion.div>
+  );
+}
+
 export function PublicSiteLayout() {
   const location = useLocation();
   const reduce = useReducedMotion();
+  const [showIntro, setShowIntro] = useState(true);
+
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+  };
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (location.hash) document.querySelector(location.hash)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
@@ -230,8 +303,12 @@ export function PublicSiteLayout() {
     }, 20);
     return () => window.clearTimeout(timer);
   }, [location.hash, location.pathname, reduce]);
+
   return (
     <div className="public-site">
+      <AnimatePresence>
+        {showIntro && <IntroPreloader onComplete={handleIntroComplete} />}
+      </AnimatePresence>
       <a className="site-skip" href="#site-main">Skip to content</a><Header />
       <AnimatePresence mode="wait">
         <motion.main id="site-main" key={location.pathname} initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? 0.1 : 0.5, ease: [0.22, 1, 0.36, 1] }}>

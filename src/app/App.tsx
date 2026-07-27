@@ -1,7 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { initStore, getSession, logout, refreshSessionFromSupabase } from "./store";
-import { supabase } from "./supabase";
+import { initStore, getSession, logout, refreshSessionFromFirebase } from "./store";
+import { auth } from "../firebase/config";
+import { onAuthStateChanged } from "firebase/auth";
 import { ProfileService } from "./services/profile.service";
 
 import type { User } from "./types";
@@ -18,6 +19,7 @@ const HomePage = lazy(() => import("./public-site/pages").then(module => ({ defa
 const ProgramsSitePage = lazy(() => import("./public-site/pages").then(module => ({ default: module.ProgramsPage })));
 const CommunitySitePage = lazy(() => import("./public-site/pages").then(module => ({ default: module.CommunityPage })));
 const AboutSitePage = lazy(() => import("./public-site/pages").then(module => ({ default: module.AboutPage })));
+const TestimonialsSitePage = lazy(() => import("./public-site/pages").then(module => ({ default: module.TestimonialsPage })));
 
 const DashboardPage = lazy(() => import("./pages/dashboard").then(module => ({ default: module.DashboardPage })));
 const SemestersPage = lazy(() => import("./pages/semesters").then(module => ({ default: module.SemestersPage })));
@@ -59,7 +61,7 @@ function EnvErrorScreen() {
         <span className="text-3xl">🔑</span>
         <h2 className="text-lg font-bold text-rose-950 mt-4">Database Keys Missing</h2>
         <p className="text-sm text-rose-700 mt-2 mb-6">
-          The Supabase connection settings (<code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code>) are not configured or are set to default placeholders. Please check your deployment settings.
+          The Firebase connection settings (<code>VITE_FIREBASE_API_KEY</code> and <code>VITE_FIREBASE_PROJECT_ID</code>) are not configured or are set to default placeholders. Please check your deployment settings.
         </p>
       </div>
     </div>
@@ -88,16 +90,16 @@ export default function App() {
   const [user, setUser] = useState<User | null>(() => getSession());
   const [envValid, setEnvValid] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicSite = ["/", "/programs", "/community", "/about"].includes(window.location.pathname);
+  const isPublicSite = ["/", "/programs", "/community", "/about", "/testimonials"].includes(window.location.pathname);
 
   console.log("App component render. User:", user, "envValid:", envValid);
 
 
   useEffect(() => {
-    // Validate Supabase environment variables on startup
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const valid = !!(url && key && key !== "your_supabase_anon_key_here" && key !== "placeholder-anon-key");
+    // Validate Firebase environment variables on startup
+    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+    const valid = !!(apiKey && projectId && apiKey !== "placeholder-api-key");
     setEnvValid(valid);
 
     document.documentElement.classList.remove("dark");
@@ -135,9 +137,9 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    const url = import.meta.env.VITE_SUPABASE_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const configured = !!(url && key && key !== "your_supabase_anon_key_here" && key !== "placeholder-anon-key");
+    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+    const configured = !!(apiKey && projectId && apiKey !== "placeholder-api-key");
     if (!configured) {
       setAuthLoading(false);
       return;
@@ -145,7 +147,7 @@ export default function App() {
 
     let active = true;
     const loadProfile = async () => {
-      const profile = await refreshSessionFromSupabase();
+      const profile = await refreshSessionFromFirebase();
       if (active) {
         setUser(profile);
         setAuthLoading(false);
@@ -153,9 +155,9 @@ export default function App() {
     };
 
     void loadProfile();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, authSession) => {
-      if (import.meta.env.DEV) console.debug("App auth state changed", { event, userId: authSession?.user?.id });
-      if (event === "SIGNED_OUT") {
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (import.meta.env.DEV) console.debug("App auth state changed", { userId: firebaseUser?.uid });
+      if (!firebaseUser) {
         if (active) setUser(null);
         return;
       }
@@ -164,17 +166,17 @@ export default function App() {
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      unsubscribeAuth();
     };
   }, []);
 
   useEffect(() => {
     if (!user?.id) return;
-    const channel = ProfileService.subscribeToCurrent(user.id, (updatedProfile) => {
+    const unsubscribe = ProfileService.subscribeToCurrent(user.id, (updatedProfile) => {
       setUser(updatedProfile);
     });
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [user?.id]);
 
@@ -205,6 +207,7 @@ export default function App() {
               <Route path="/programs" element={<ProgramsSitePage />} />
               <Route path="/community" element={<CommunitySitePage />} />
               <Route path="/about" element={<AboutSitePage />} />
+              <Route path="/testimonials" element={<TestimonialsSitePage />} />
               <Route
                 path="/login"
                 element={

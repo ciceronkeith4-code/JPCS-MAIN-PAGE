@@ -1,17 +1,20 @@
-import { supabase } from "../supabase";
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, writeBatch } from "firebase/firestore";
+import { db } from "../../firebase/config";
 import type { ApiResponse } from "../config/app.config";
 import type { Subject } from "../types";
 
 export const SubjectService = {
   async fetchAll(semesterId?: string): Promise<ApiResponse<Subject[]>> {
     try {
-      let query = supabase.from("subjects").select("*");
+      let snap;
       if (semesterId) {
-        query = query.eq("semester_id", semesterId);
+        const q = query(collection(db, "subjects"), where("semester_id", "==", semesterId));
+        snap = await getDocs(q);
+      } else {
+        snap = await getDocs(collection(db, "subjects"));
       }
-      const { data, error } = await query;
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data: data || [], error: null };
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Subject[];
+      return { success: true, data, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -19,14 +22,8 @@ export const SubjectService = {
 
   async add(subject: Subject): Promise<ApiResponse<Subject>> {
     try {
-      const { data, error } = await supabase
-        .from("subjects")
-        .insert(subject)
-        .select()
-        .maybeSingle();
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data, error: null };
+      await setDoc(doc(db, "subjects", subject.id), subject);
+      return { success: true, data: subject, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -34,13 +31,13 @@ export const SubjectService = {
 
   async bulkAdd(subjects: Subject[]): Promise<ApiResponse<Subject[]>> {
     try {
-      const { data, error } = await supabase
-        .from("subjects")
-        .upsert(subjects, { onConflict: "id", ignoreDuplicates: true })
-        .select();
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data: data || [], error: null };
+      // Use writeBatch for atomic multi-doc upsert (mirrors Supabase upsert/ignoreDuplicates)
+      const batch = writeBatch(db);
+      subjects.forEach((subject) => {
+        batch.set(doc(db, "subjects", subject.id), subject, { merge: true });
+      });
+      await batch.commit();
+      return { success: true, data: subjects, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -48,15 +45,8 @@ export const SubjectService = {
 
   async update(id: string, data: Partial<Subject>): Promise<ApiResponse<Subject>> {
     try {
-      const { data: updated, error } = await supabase
-        .from("subjects")
-        .update(data)
-        .eq("id", id)
-        .select()
-        .maybeSingle();
-
-      if (error) return { success: false, data: null, error: error.message };
-      return { success: true, data: updated, error: null };
+      await updateDoc(doc(db, "subjects", id), data as Record<string, unknown>);
+      return { success: true, data: { id, ...data } as Subject, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -64,8 +54,7 @@ export const SubjectService = {
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
-      const { error } = await supabase.from("subjects").delete().eq("id", id);
-      if (error) return { success: false, data: null, error: error.message };
+      await deleteDoc(doc(db, "subjects", id));
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };

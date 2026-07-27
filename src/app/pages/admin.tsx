@@ -16,7 +16,7 @@ import {
 } from "../store";
 import type { AwardSetting, Announcement, CurriculumItem, User } from "../types";
 import { ProfileService } from "../services/profile.service";
-import { supabase } from "../supabase";
+
 
 // ── Admin Dashboard ────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ export function AdminDashboardPage() {
     });
     return () => {
       active = false;
-      supabase.removeChannel(channel);
+      channel();
     };
   }, []);
 
@@ -218,7 +218,7 @@ export function StudentManagementPage() {
     return () => {
       active = false;
       window.removeEventListener("focus", loadUsers);
-      supabase.removeChannel(channel);
+      channel();
     };
   }, []);
 
@@ -751,7 +751,7 @@ export function StudentManagementPage() {
                 {uploading ? (
                   <>
                     <span className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    <span className="min-w-0">Uploading to Supabase Storage...</span>
+                    <span className="min-w-0">Uploading to Firebase Storage...</span>
                   </>
                 ) : (
                   <span>Save Student Changes</span>

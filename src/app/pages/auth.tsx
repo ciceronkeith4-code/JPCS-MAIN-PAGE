@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button, Input, Select, Alert, Tabs } from "../components/ui";
 import { checkLoginEmail, login, register, sendPasswordResetEmail } from "../store";
-import { supabase } from "../supabase";
+import { auth } from "../../firebase/config";
+import {
+  confirmPasswordReset,
+  verifyPasswordResetCode,
+  signOut as firebaseSignOut,
+} from "firebase/auth";
 import type { User } from "../types";
 
 interface AuthProps {
@@ -461,37 +466,32 @@ export function ResetPasswordPage() {
     let active = true;
 
     const detectRecoverySession = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
       const queryParams = new URLSearchParams(window.location.search);
-      const redirectError = hashParams.get("error_description") || queryParams.get("error_description");
+      const oobCode = queryParams.get("oobCode");
+      const errorParam = queryParams.get("error_description");
 
-      if (redirectError) {
-        if (active) setError(decodeURIComponent(redirectError.replace(/\+/g, " ")));
+      if (errorParam) {
+        if (active) setError(decodeURIComponent(errorParam.replace(/\+/g, " ")));
         return;
       }
 
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      if (!active) return;
+      if (!oobCode) {
+        if (active) setError("Invalid or missing password reset link. Please request a new one.");
+        return;
+      }
 
-      if (sessionError) {
-        setError(sessionError.message);
-      } else if (data.session) {
-        setRecoveryReady(true);
+      try {
+        // Verify the code is still valid before showing the form
+        await verifyPasswordResetCode(auth, oobCode);
+        if (active) setRecoveryReady(true);
+      } catch (err: any) {
+        if (active) setError(err?.message || "This reset link has expired or is invalid. Please request a new one.");
       }
     };
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!active) return;
-      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
-        setRecoveryReady(true);
-        setError("");
-      }
-    });
 
     void detectRecoverySession();
     return () => {
       active = false;
-      subscription.unsubscribe();
     };
   }, []);
 
@@ -514,16 +514,17 @@ export function ResetPasswordPage() {
     }
 
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-    if (updateError) {
+    const queryParams = new URLSearchParams(window.location.search);
+    const oobCode = queryParams.get("oobCode") || "";
+    try {
+      await confirmPasswordReset(auth, oobCode, newPassword);
+      await firebaseSignOut(auth);
       setLoading(false);
-      setError(updateError.message);
-      return;
+      setSuccess(true);
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || "Failed to reset password. Please request a new link.");
     }
-
-    await supabase.auth.signOut();
-    setLoading(false);
-    setSuccess(true);
   };
 
   return (

@@ -203,15 +203,14 @@ export function AppLayout({ user, onLogout, isAdmin }: AppLayoutProps) {
       {/* ── Desktop Left Sidebar ───────────────────────────────────── */}
       <aside className="hidden lg:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0 sticky top-0 h-screen justify-between z-30">
         <div>
-          <div className="h-16 flex items-center px-6 border-b border-slate-200 gap-3">
-            <img
-              src="/jpcs-logo.png"
-              alt="JPCS Manila Chapter logo"
-              className="size-9 shrink-0 rounded-full object-contain bg-white"
-            />
+          <div className="h-16 flex items-center px-6 border-b border-slate-200 gap-2.5">
+            <div className="flex gap-1.5 shrink-0">
+              <img src="/sscr-logo.png" alt="SSCR logo" className="size-8 object-contain bg-white rounded-full" />
+              <img src="/jpcs-logo.png" alt="JPCS logo" className="size-8 object-contain bg-white rounded-full" />
+            </div>
             <div>
-              <h1 className="text-[10px] font-bold text-slate-900 tracking-tight leading-none">Junior Philippine Computer Society</h1>
-              <p className="text-[9px] text-slate-500 mt-0.5 font-medium">SSCR Manila Chapter Portal</p>
+              <h1 className="text-[10px] font-bold text-slate-900 tracking-tight leading-none">IT DEPARTMENT OF SSCR MANILA</h1>
+              <p className="text-[9px] text-slate-500 mt-0.5 font-medium">JPCS | SSCR MANILA CHAPTER Portal</p>
             </div>
           </div>
 
@@ -325,13 +324,15 @@ export function AppLayout({ user, onLogout, isAdmin }: AppLayoutProps) {
             <div className="absolute inset-0 bg-black/20" onClick={() => setMobileMenuOpen(false)} />
             <aside className="absolute inset-y-0 left-0 w-64 bg-white shadow-xl flex flex-col justify-between">
               <div>
-                <div className="h-16 flex items-center px-5 border-b border-slate-200 shrink-0 gap-3">
-                  <img
-                    src="/jpcs-logo.png"
-                    alt="JPCS Manila Chapter logo"
-                    className="size-9 shrink-0 rounded-full object-contain bg-white"
-                  />
-                  <span className="font-bold text-slate-900 text-xs">Junior Philippine Computer Society Portal</span>
+                <div className="h-16 flex items-center px-5 border-b border-slate-200 shrink-0 gap-2.5">
+                  <div className="flex gap-1.5 shrink-0">
+                    <img src="/sscr-logo.png" alt="SSCR logo" className="size-8 object-contain bg-white rounded-full" />
+                    <img src="/jpcs-logo.png" alt="JPCS logo" className="size-8 object-contain bg-white rounded-full" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-900 text-[10px] leading-tight">IT DEPARTMENT OF SSCR MANILA</span>
+                    <span className="text-[9px] text-slate-500 font-medium">JPCS | SSCR MANILA CHAPTER Portal</span>
+                  </div>
                 </div>
                 <nav className="p-4 space-y-1">
                   {nav.map((item) => (
