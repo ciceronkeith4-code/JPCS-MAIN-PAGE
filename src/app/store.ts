@@ -657,13 +657,23 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
 }
 
 export async function resendVerification(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  console.log("Resending verification email for:", email);
   try {
     const credential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+    console.log("Signed in temporary session. UID:", credential.user.uid, "EmailVerified status:", credential.user.emailVerified);
+    
     await sendEmailVerification(credential.user);
+    console.log("Resend verification email successfully sent to:", credential.user.email);
+    
     await firebaseSignOut(auth);
+    console.log("Signed out temporary session");
     return { success: true };
   } catch (err: any) {
-    if (auth.currentUser) await firebaseSignOut(auth);
+    console.error("Resend verification email failed. Complete error object:", err);
+    if (auth.currentUser) {
+      await firebaseSignOut(auth);
+      console.log("Cleaned up signed-in session after resend error");
+    }
     return { success: false, error: err.message || "Failed to resend verification email." };
   }
 }
