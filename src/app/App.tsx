@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { initStore, getSession, logout, refreshSessionFromFirebase } from "./store";
 import { auth } from "../firebase/config";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { ProfileService } from "./services/profile.service";
 
 import type { User } from "./types";
@@ -147,6 +147,25 @@ export default function App() {
 
     let active = true;
     const loadProfile = async () => {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          await currentUser.reload();
+          if (!currentUser.emailVerified) {
+            console.warn("Unverified user blocked in global auth guard:", currentUser.uid);
+            await signOut(auth);
+            localStorage.removeItem("sscr_session");
+            if (active) {
+              setUser(null);
+              setAuthLoading(false);
+            }
+            return;
+          }
+        } catch (reloadErr) {
+          console.error("Error reloading user in global auth guard:", reloadErr);
+        }
+      }
+
       const profile = await refreshSessionFromFirebase();
       if (active) {
         setUser(profile);

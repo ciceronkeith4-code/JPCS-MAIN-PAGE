@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button, Input, Select, Alert, Tabs } from "../components/ui";
-import { checkLoginEmail, login, register, sendPasswordResetEmail } from "../store";
+import { checkLoginEmail, login, register, sendPasswordResetEmail, resendVerification } from "../store";
 import { auth } from "../../firebase/config";
 import {
   confirmPasswordReset,
@@ -58,7 +58,18 @@ export function LoginPage({ onAuth }: AuthProps) {
     message: string;
   } | null>(null);
 
-  const passwordReady = emailStatus === "verified";
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendMessage, setResendMessage] = useState<{ variant: "success" | "error"; text: string } | null>(null);
+
+  const passwordReady = emailStatus === "verified" || emailStatus === "unverified";
+
+  // Cooldown timer handler
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
@@ -67,11 +78,44 @@ export function LoginPage({ onAuth }: AuthProps) {
     setError("");
     setPassword("");
     setShowPassword(false);
+    setResendMessage(null);
+  };
+
+  const handleResendVerification = async () => {
+    if (!email.trim() || !password) {
+      setError("Please enter your password to request a new verification email.");
+      return;
+    }
+    setResendLoading(true);
+    setResendMessage(null);
+    try {
+      const res = await resendVerification(email, password);
+      if (res.success) {
+        setResendMessage({
+          variant: "success",
+          text: "Verification link dispatched! Please check your official email inbox.",
+        });
+        setResendCooldown(60);
+      } else {
+        setResendMessage({
+          variant: "error",
+          text: res.error || "Failed to resend verification email.",
+        });
+      }
+    } catch (err: any) {
+      setResendMessage({
+        variant: "error",
+        text: err.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setResendMessage(null);
 
     if (!passwordReady) {
       const normalizedEmail = email.trim().toLowerCase();
@@ -110,7 +154,7 @@ export function LoginPage({ onAuth }: AuthProps) {
         setEmailNotice({
           variant: "warning",
           title: "Email not verified",
-          message: "Your account exists, but your email is not verified yet. Open the verification message in your inbox before signing in.",
+          message: "Your account exists, but your email is not verified yet. Enter your password below to log in or request a new verification link.",
         });
         return;
       }
@@ -135,6 +179,8 @@ export function LoginPage({ onAuth }: AuthProps) {
     navigate(result.user.role === "admin" ? "/admin" : "/dashboard");
   };
 
+  const isUnverifiedError = error && (error.includes("not been verified") || emailStatus === "unverified");
+
   return (
     <AuthLayout publicChrome>
       <header className="mb-6 text-center">
@@ -147,6 +193,12 @@ export function LoginPage({ onAuth }: AuthProps) {
       <AuthTabs active="login" />
 
       {error && <Alert variant="error" className="mb-5" title="Sign in failed">{error}</Alert>}
+
+      {resendMessage && (
+        <Alert variant={resendMessage.variant} className="mb-5" title={resendMessage.variant === "success" ? "Success" : "Error"}>
+          {resendMessage.text}
+        </Alert>
+      )}
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
         <div className="relative">
@@ -168,7 +220,7 @@ export function LoginPage({ onAuth }: AuthProps) {
                 : "border-slate-200 focus:border-primary focus:ring-primary/15"
             }`}
           />
-          {passwordReady && (
+          {passwordReady && emailStatus === "verified" && (
             <svg aria-hidden="true" className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="m5 12 4 4L19 6" />
             </svg>
@@ -212,14 +264,28 @@ export function LoginPage({ onAuth }: AuthProps) {
                 )}
               </button>
             </div>
-
-
           </div>
         )}
 
-        <Button type="submit" size="lg" loading={loading} className="h-12 w-full rounded-xl text-sm font-bold uppercase tracking-[0.12em] shadow-[0_8px_20px_rgba(139,30,36,0.18)]">
-          {passwordReady ? "Sign In" : "Continue"}
-        </Button>
+        <div className="flex flex-col gap-2.5">
+          <Button type="submit" size="lg" loading={loading} className="h-12 w-full rounded-xl text-sm font-bold uppercase tracking-[0.12em] shadow-[0_8px_20px_rgba(139,30,36,0.18)]">
+            {passwordReady ? "Sign In" : "Continue"}
+          </Button>
+
+          {isUnverifiedError && password && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              loading={resendLoading}
+              disabled={resendCooldown > 0}
+              onClick={handleResendVerification}
+              className="h-12 w-full rounded-xl text-xs font-bold uppercase tracking-[0.08em]"
+            >
+              {resendCooldown > 0 ? `Resend Link (${resendCooldown}s)` : "Resend Verification Email"}
+            </Button>
+          )}
+        </div>
 
         {passwordReady && (
           <div className="flex justify-center pt-1">

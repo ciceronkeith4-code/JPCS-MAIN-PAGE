@@ -33,16 +33,22 @@ export const AuthService = {
       const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
-        return { success: true, data: "not_registered", error: null };
+        // Look up pending profiles to see if they registered but are unverified
+        const pendingQ = query(collection(db, "pending_profiles"), where("email", "==", normalizedEmail));
+        const pendingSnap = await getDocs(pendingQ);
+        if (pendingSnap.empty) {
+          return { success: true, data: "not_registered", error: null };
+        }
+        return { success: true, data: "unverified", error: null };
       }
-      // Email exists in DB — treat as verified here; real check is in login()
+      // Email exists in DB — verified
       return { success: true, data: "verified", error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to check this email address." };
     }
   },
 
-  async login(email: string, password: string): Promise<ApiResponse<User>> {
+  async login(email: string, password: string): Promise<ApiResponse<import("firebase/auth").User>> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail.includes("@")) {
       return { success: false, data: null, error: "Sign in with your registered email address." };
@@ -52,52 +58,20 @@ export const AuthService = {
       const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const firebaseUser = credential.user;
 
+      // Reload user to get latest verification status from Firebase
+      await firebaseUser.reload();
+
       // ── Email verification gate (Firebase Auth is the authoritative source) ──
       if (!firebaseUser.emailVerified) {
         await firebaseSignOut(auth);
         return {
           success: false,
           data: null,
-          error: "Your email is not verified yet. Please check your inbox and click the verification link before signing in.",
+          error: "Your email has not been verified. Please verify your email before logging in.",
         };
       }
 
-      const userId = firebaseUser.uid;
-      if (import.meta.env.DEV) console.debug("Authenticated user for profile load", { userId });
-
-      // Find profile by UID first, then fall back to email (handles migrated accounts)
-      let profile: User | null = null;
-      const userRef = doc(db, "users", userId);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists()) {
-        profile = { id: userId, ...userSnap.data() } as User;
-      } else {
-        // Migrated account: find by email and update document ID to Firebase UID
-        const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const oldData = snapshot.docs[0].data();
-          profile = { ...oldData, id: userId, verified: true } as User;
-          await setDoc(userRef, profile);
-        } else {
-          // No profile at all — create a minimal one
-          profile = {
-            id: userId,
-            email: normalizedEmail,
-            full_name: String(firebaseUser.displayName || normalizedEmail),
-            student_number: "",
-            course: "BSIT",
-            year_level: "1",
-            role: "student",
-            verified: true,
-          };
-          await setDoc(userRef, profile);
-        }
-      }
-
-      if (import.meta.env.DEV) console.debug("Profile loaded after sign-in", { profileId: profile.id });
-      return { success: true, data: profile, error: null };
+      return { success: true, data: firebaseUser, error: null };
     } catch (err: any) {
       const isCredentialError = err?.code === "auth/invalid-credential"
         || err?.code === "auth/wrong-password"

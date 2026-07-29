@@ -5,6 +5,8 @@ import {
   getDocs,
   doc,
   setDoc,
+  getDoc,
+  deleteDoc,
   writeBatch,
   onSnapshot,
 } from "firebase/firestore";
@@ -473,10 +475,104 @@ export async function checkLoginEmail(email: string): Promise<{ status: LoginEma
 export async function login(email: string, password: string): Promise<{ user: User | null; error?: string }> {
   const res = await AuthService.login(email, password);
   if (res.success && res.data) {
-    saveCache(KEYS.session, res.data);
-    setOnlineStatus(res.data.id, true);
-    await syncFromFirebase();
-    return { user: res.data };
+    const firebaseUser = res.data;
+    const userId = firebaseUser.uid;
+    const userRef = doc(db, "users", userId);
+    
+    let profile: User | null = null;
+    try {
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        profile = { id: userId, ...userSnap.data() } as User;
+        
+        // Ensure verified flag is true in local session
+        profile.verified = true;
+      } else {
+        // First verified login: retrieve details from pending_profiles
+        console.log("Verified login detected, loading pending profile details...");
+        const pendingRef = doc(db, "pending_profiles", userId);
+        const pendingSnap = await getDoc(pendingRef);
+
+        if (pendingSnap.exists()) {
+          const pendingData = pendingSnap.data();
+          profile = { ...pendingData, id: userId, role: "student", verified: true } as User;
+
+          // Create official Firestore user profile
+          console.log("Migrating pending profile to users collection...");
+          await setDoc(userRef, profile);
+
+          // Seed semesters and subjects for regular students
+          if (profile.year_level && profile.year_level !== "Irregular") {
+            console.log("Auto-seeding academic records for verified student...");
+            const targetYearNum = parseInt(profile.year_level) || 1;
+            const curriculum = loadCache<CurriculumItem[]>(KEYS.curriculum, DEFAULT_CURRICULUM);
+            
+            const semId = uid();
+            const sem: Semester = {
+              id: semId,
+              user_id: userId,
+              academic_year: "2025–2026",
+              semester: "First Semester"
+            };
+
+            // Save to local cache first
+            const allSems = loadCache<Semester[]>(KEYS.semesters, []);
+            saveCache(KEYS.semesters, [...allSems, sem]);
+
+            // Save to Firestore
+            await SemesterService.add(sem);
+
+            const matching = curriculum.filter(
+              (c) => c.course === profile!.course && String(c.year_level) === String(targetYearNum) && c.semester === "First Semester"
+            );
+
+            const subjectsToInsert: Subject[] = matching.map((item) => ({
+              id: uid(),
+              semester_id: semId,
+              subject_code: item.subject_code,
+              subject_name: item.subject_name,
+              units: item.units,
+              grade: 0,
+              status: "Graded",
+            }));
+
+            // Save to local cache first
+            const allSubs = loadCache<Subject[]>(KEYS.subjects, []);
+            saveCache(KEYS.subjects, [...allSubs, ...subjectsToInsert]);
+
+            // Save to Firestore
+            await SubjectService.bulkAdd(subjectsToInsert);
+          }
+
+          // Delete temporary pending profile
+          await deleteDoc(pendingRef);
+          console.log("Pending profile deleted successfully.");
+        } else {
+          // Fallback if no pending profile document exists
+          console.log("No pending profile found, creating default user doc...");
+          profile = {
+            id: userId,
+            email: firebaseUser.email || email.trim().toLowerCase(),
+            full_name: String(firebaseUser.displayName || email.split("@")[0]),
+            student_number: "",
+            course: "BSIT",
+            year_level: "1",
+            role: "student",
+            verified: true,
+          };
+          await setDoc(userRef, profile);
+        }
+      }
+
+      saveCache(KEYS.session, profile);
+      setOnlineStatus(profile.id, true);
+      await syncFromFirebase();
+      return { user: profile };
+    } catch (err: any) {
+      console.error("Error setting up verified user session:", err);
+      await firebaseSignOut(auth);
+      return { user: null, error: err.message || "Failed to set up verified user session." };
+    }
   }
   return { user: null, error: res.error || "Login failed" };
 }
@@ -530,14 +626,14 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
     const currentUsers = loadCache<User[]>(KEYS.users, []);
     saveCache(KEYS.users, [...currentUsers, newUser]);
 
-    // Persist user profile to Firestore
+    // Save registration details to pending_profiles instead of users collection
     if (isFirebaseConfigured() && credential) {
-      console.log("Creating Firestore profile...");
+      console.log("Saving details to pending_profiles...");
       try {
-        await setDoc(doc(db, "users", finalId), newUser);
-        console.log("Firestore profile created");
+        await setDoc(doc(db, "pending_profiles", finalId), newUser);
+        console.log("Pending profile details saved");
       } catch (dbErr: any) {
-        console.error("Firestore profile creation failed. Complete error object:", dbErr);
+        console.error("Firestore pending profile creation failed. Complete error object:", dbErr);
         // Clean up Auth user if Firestore doc creation fails
         try {
           await credential.user.delete();
@@ -545,82 +641,7 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
         } catch (cleanupErr) {
           console.error("Failed to clean up Auth account:", cleanupErr);
         }
-        return { user: null, error: dbErr.message || "Failed to save user profile. Please try again." };
-      }
-
-      // Regular student auto-seed
-      if (data.year_level && data.year_level !== "Irregular") {
-        console.log("Auto-seeding regular student semesters and subjects...");
-        const targetYearNum = parseInt(data.year_level) || 1;
-        const curriculum = loadCache<CurriculumItem[]>(KEYS.curriculum, DEFAULT_CURRICULUM);
-        
-        const semId = uid();
-        const sem: Semester = {
-          id: semId,
-          user_id: newUser.id,
-          academic_year: "2025–2026",
-          semester: "First Semester"
-        };
-
-        // Cache locally first
-        const allSems = loadCache<Semester[]>(KEYS.semesters, []);
-        saveCache(KEYS.semesters, [...allSems, sem]);
-
-        // Save to Firestore (Awaited!)
-        try {
-          const semRes = await SemesterService.add(sem);
-          if (!semRes.success) {
-            throw new Error(semRes.error || "Failed to add initial semester.");
-          }
-          console.log("Firestore initial semester created");
-        } catch (semErr: any) {
-          console.error("Semester doc creation failed. Complete error object:", semErr);
-          // Clean up Auth user
-          try {
-            await credential.user.delete();
-            console.log("Cleaned up Auth account due to semester write failure.");
-          } catch (cleanupErr) {
-            console.error("Failed to clean up Auth account:", cleanupErr);
-          }
-          return { user: null, error: semErr.message || "Failed to save initial academic record." };
-        }
-
-        const matching = curriculum.filter(
-          (c) => c.course === data.course && String(c.year_level) === String(targetYearNum) && c.semester === "First Semester"
-        );
-
-        const subjectsToInsert: Subject[] = matching.map((item) => ({
-          id: uid(),
-          semester_id: semId,
-          subject_code: item.subject_code,
-          subject_name: item.subject_name,
-          units: item.units,
-          grade: 0,
-          status: "Graded",
-        }));
-
-        // Cache locally first
-        const allSubs = loadCache<Subject[]>(KEYS.subjects, []);
-        saveCache(KEYS.subjects, [...allSubs, ...subjectsToInsert]);
-
-        // Save to Firestore (Awaited!)
-        try {
-          const subRes = await SubjectService.bulkAdd(subjectsToInsert);
-          if (!subRes.success) {
-            throw new Error(subRes.error || "Failed to add initial subjects.");
-          }
-          console.log("Firestore initial subjects created");
-        } catch (subErr: any) {
-          console.error("Subject docs creation failed. Complete error object:", subErr);
-          // Clean up Auth user
-          try {
-            await credential.user.delete();
-            console.log("Cleaned up Auth account due to subject write failure.");
-          } catch (cleanupErr) {
-            console.error("Failed to clean up Auth account:", cleanupErr);
-          }
-          return { user: null, error: subErr.message || "Failed to save initial academic records." };
-        }
+        return { user: null, error: dbErr.message || "Failed to save registration details. Please try again." };
       }
 
       console.log("Signing out user to enforce verification on next login...");
@@ -632,6 +653,18 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
   } catch (err: any) {
     console.error("Unexpected registration error. Complete error object:", err);
     return { user: null, error: err?.message || "Registration failed" };
+  }
+}
+
+export async function resendVerification(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const credential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+    await sendEmailVerification(credential.user);
+    await firebaseSignOut(auth);
+    return { success: true };
+  } catch (err: any) {
+    if (auth.currentUser) await firebaseSignOut(auth);
+    return { success: false, error: err.message || "Failed to resend verification email." };
   }
 }
 
