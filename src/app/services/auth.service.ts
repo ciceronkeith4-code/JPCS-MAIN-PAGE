@@ -1,7 +1,6 @@
 import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
-  sendPasswordResetEmail as firebaseSendPasswordReset,
   createUserWithEmailAndPassword,
 } from "firebase/auth";
 import {
@@ -9,9 +8,6 @@ import {
   query,
   where,
   getDocs,
-  doc,
-  getDoc,
-  setDoc,
 } from "firebase/firestore";
 import { auth, db } from "../../firebase/config";
 import type { ApiResponse } from "../config/app.config";
@@ -27,9 +23,7 @@ export const AuthService = {
     }
 
     try {
-      // Only check if the email is registered — do NOT rely on the Firestore
-      // 'verified' field (it can be stale from old Supabase migration data).
-      // The authoritative verified check happens inside login() using Firebase Auth.
+      // Check if email exists in verified users
       const q = query(collection(db, "users"), where("email", "==", normalizedEmail));
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
@@ -72,15 +66,6 @@ export const AuthService = {
   async logout(): Promise<ApiResponse<void>> {
     try {
       await firebaseSignOut(auth);
-      return { success: true, data: null, error: null };
-    } catch (err: any) {
-      return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
-    }
-  },
-
-  async sendPasswordResetEmail(email: string, _redirectTo: string): Promise<ApiResponse<void>> {
-    try {
-      await firebaseSendPasswordReset(auth, email);
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };

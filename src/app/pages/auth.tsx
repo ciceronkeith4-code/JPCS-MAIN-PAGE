@@ -2,12 +2,6 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button, Input, Select, Alert, Tabs } from "../components/ui";
 import { checkLoginEmail, login, register, sendPasswordResetEmail, resendVerification } from "../store";
-import { auth } from "../../firebase/config";
-import {
-  confirmPasswordReset,
-  verifyPasswordResetCode,
-  signOut as firebaseSignOut,
-} from "firebase/auth";
 import type { User } from "../types";
 
 interface AuthProps {
@@ -82,18 +76,18 @@ export function LoginPage({ onAuth }: AuthProps) {
   };
 
   const handleResendVerification = async () => {
-    if (!email.trim() || !password) {
-      setError("Please enter your password to request a new verification email.");
+    if (!email.trim()) {
+      setError("Please enter your email address to request a new verification email.");
       return;
     }
     setResendLoading(true);
     setResendMessage(null);
     try {
-      const res = await resendVerification(email, password);
+      const res = await resendVerification(email);
       if (res.success) {
         setResendMessage({
           variant: "success",
-          text: "Verification link dispatched! Please check your official email inbox.",
+          text: "Verification link dispatched! Please check your email inbox.",
         });
         setResendCooldown(60);
       } else {
@@ -442,7 +436,7 @@ export function ForgotPasswordPage() {
     setError("");
     const emailLower = email.trim().toLowerCase();
     if (!emailLower) {
-      setError("Please enter your official email address.");
+      setError("Please enter your email address.");
       return;
     }
     if (!emailLower.includes("@")) {
@@ -466,43 +460,33 @@ export function ForgotPasswordPage() {
         <h1 className="text-xl font-bold text-foreground">Reset your password</h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-[285px] mx-auto leading-relaxed">
           {sent
-            ? "We received a request to reset your password. An email with your reset link has been sent."
-            : "Enter your official institutional email to receive a password reset link in Gmail."}
+            ? "If your email is registered, a reset link has been sent to your inbox."
+            : "Enter your email address to receive a password reset link."}
         </p>
       </div>
 
       {sent ? (
         <div className="space-y-4 mb-4 text-center">
           <Alert variant="success" className="text-xs text-left leading-relaxed">
-            📩 Password reset link dispatched! We sent a password reset email to:
+            📩 Password reset link dispatched! Check your inbox at:
             <strong className="block mt-1 font-mono text-sm text-emerald-800">{email}</strong>
           </Alert>
-
-          <a
-            href="https://mail.google.com"
-            target="_blank"
-            rel="noreferrer"
-            className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm"
-          >
-            📧 Open Gmail Inbox
-          </a>
-
           <p className="text-xs text-muted-foreground">
-            For security, use the reset link in the email. It contains the temporary recovery session required to change your password.
+            The link expires in 1 hour. Check your spam folder if you do not see the email.
           </p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 mb-4">
           {error && <Alert variant="error" className="text-xs">{error}</Alert>}
           <Input
-            label="Official Email"
+            label="Email Address"
             type="email"
-            placeholder="you@sscrmnl.edu.ph"
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <Button type="submit" size="lg" loading={loading} className="w-full">
-            Send Reset Link to Gmail
+            Send Reset Link
           </Button>
         </form>
       )}
@@ -518,51 +502,30 @@ export function ForgotPasswordPage() {
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [recoveryReady, setRecoveryReady] = useState(false);
+  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
+
+  const token = searchParams.get("token");
 
   useEffect(() => {
-    let active = true;
-
-    const detectRecoverySession = async () => {
-      const queryParams = new URLSearchParams(window.location.search);
-      const oobCode = queryParams.get("oobCode");
-      const errorParam = queryParams.get("error_description");
-
-      if (errorParam) {
-        if (active) setError(decodeURIComponent(errorParam.replace(/\+/g, " ")));
-        return;
-      }
-
-      if (!oobCode) {
-        if (active) setError("Invalid or missing password reset link. Please request a new one.");
-        return;
-      }
-
-      try {
-        // Verify the code is still valid before showing the form
-        await verifyPasswordResetCode(auth, oobCode);
-        if (active) setRecoveryReady(true);
-      } catch (err: any) {
-        if (active) setError(err?.message || "This reset link has expired or is invalid. Please request a new one.");
-      }
-    };
-
-    void detectRecoverySession();
-    return () => {
-      active = false;
-    };
-  }, []);
+    if (!token) {
+      setError("Invalid or missing password reset link. Please request a new one.");
+      setTokenValid(false);
+    } else {
+      setTokenValid(true);
+    }
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!recoveryReady) {
+    if (!tokenValid || !token) {
       setError("This reset link is invalid or has expired. Request a new password reset email.");
       return;
     }
@@ -577,16 +540,21 @@ export function ResetPasswordPage() {
     }
 
     setLoading(true);
-    const queryParams = new URLSearchParams(window.location.search);
-    const oobCode = queryParams.get("oobCode") || "";
     try {
-      await confirmPasswordReset(auth, oobCode, newPassword);
-      await firebaseSignOut(auth);
-      setLoading(false);
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reset password.');
+      }
       setSuccess(true);
     } catch (err: any) {
+      setError(err.message || "Failed to reset password. Please request a new link.");
+    } finally {
       setLoading(false);
-      setError(err?.message || "Failed to reset password. Please request a new link.");
     }
   };
 

@@ -10,7 +10,7 @@ import {
   writeBatch,
   onSnapshot,
 } from "firebase/firestore";
-import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification, signOut as firebaseSignOut, signInWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, signOut as firebaseSignOut, signInWithEmailAndPassword } from "firebase/auth";
 import { APP_CONFIG } from "./config/app.config";
 import { AuthService, type LoginEmailStatus } from "./services/auth.service";
 import { ProfileService } from "./services/profile.service";
@@ -232,7 +232,7 @@ export function initStore() {
       unsubscribers.forEach((unsub) => unsub());
       unsubscribers = [];
 
-      if (firebaseUser && firebaseUser.emailVerified) {
+      if (firebaseUser) {
         // Authenticated and verified user exists: start sync and listeners
         syncFromFirebase().catch(console.error);
 
@@ -628,24 +628,22 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
   }
 }
 
-export async function resendVerification(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-  console.log("Resending verification email for:", email);
+export async function resendVerification(email: string, _password?: string): Promise<{ success: boolean; error?: string }> {
+  console.log("Resending verification email via Brevo for:", email);
   try {
-    const credential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-    console.log("Signed in temporary session. UID:", credential.user.uid, "EmailVerified status:", credential.user.emailVerified);
-    
-    await sendEmailVerification(credential.user);
-    console.log("Resend verification email successfully sent to:", credential.user.email);
-    
-    await firebaseSignOut(auth);
-    console.log("Signed out temporary session");
+    const response = await fetch('/api/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to resend verification email.');
+    }
+    console.log("Resend verification email dispatched via Brevo.");
     return { success: true };
   } catch (err: any) {
-    console.error("Resend verification email failed. Complete error object:", err);
-    if (auth.currentUser) {
-      await firebaseSignOut(auth);
-      console.log("Cleaned up signed-in session after resend error");
-    }
+    console.error("Resend verification email failed:", err);
     return { success: false, error: err.message || "Failed to resend verification email." };
   }
 }
@@ -1165,15 +1163,23 @@ export function deleteUser(id: string) {
 }
 
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
-  if (!isFirebaseConfigured()) {
-    return { success: false, error: "Firebase Auth is not configured." };
+  console.log("Sending password reset email via Brevo for:", email);
+  try {
+    const response = await fetch('/api/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to send password reset email.');
+    }
+    console.log("Password reset email dispatched via Brevo.");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Password reset email failed:", err);
+    return { success: false, error: err.message || "Unable to send the password reset email." };
   }
-
-  const resetLink = `${window.location.origin}/reset-password`;
-  const result = await AuthService.sendPasswordResetEmail(email, resetLink);
-  return result.success
-    ? { success: true }
-    : { success: false, error: result.error || "Unable to send the password reset email." };
 }
 
 export function compressImage(file: File, maxWidth = 600, maxHeight = 600, quality = 0.75): Promise<string> {

@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { initStore, getSession, logout, refreshSessionFromFirebase } from "./store";
 import { auth } from "../firebase/config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/config";
 import { ProfileService } from "./services/profile.service";
 
 import type { User } from "./types";
@@ -151,8 +153,10 @@ export default function App() {
       const currentUser = auth.currentUser;
       if (currentUser) {
         try {
-          await currentUser.reload();
-          if (!currentUser.emailVerified) {
+          // Check Firestore verified field instead of Firebase emailVerified
+          const userRef = doc(db, 'users', currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists() && userSnap.data().verified === false) {
             console.warn("Unverified user blocked in global auth guard:", currentUser.uid);
             await signOut(auth);
             localStorage.removeItem("sscr_session");
@@ -162,8 +166,23 @@ export default function App() {
             }
             return;
           }
-        } catch (reloadErr) {
-          console.error("Error reloading user in global auth guard:", reloadErr);
+          // Also block if user is only in pending_profiles (not yet verified)
+          if (!userSnap.exists()) {
+            const pendingRef = doc(db, 'pending_profiles', currentUser.uid);
+            const pendingSnap = await getDoc(pendingRef);
+            if (pendingSnap.exists()) {
+              console.warn("Pending (unverified) user blocked in global auth guard:", currentUser.uid);
+              await signOut(auth);
+              localStorage.removeItem("sscr_session");
+              if (active) {
+                setUser(null);
+                setAuthLoading(false);
+              }
+              return;
+            }
+          }
+        } catch (guardErr) {
+          console.error("Error in global auth guard:", guardErr);
         }
       }
 
