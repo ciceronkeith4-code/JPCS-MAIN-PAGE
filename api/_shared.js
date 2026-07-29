@@ -14,7 +14,13 @@ function parseJsonCandidate(value, fallback = null) {
 }
 
 export function getFirebaseAdmin() {
-  if (admin.apps.length) {
+  const activeApps = typeof admin.getApps === 'function'
+    ? admin.getApps()
+    : Array.isArray(admin.apps)
+      ? admin.apps
+      : [];
+
+  if (activeApps.length) {
     return admin;
   }
 
