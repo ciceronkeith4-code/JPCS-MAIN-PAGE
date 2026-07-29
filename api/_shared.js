@@ -3,7 +3,8 @@ import fs from 'fs';
 import path from 'path';
 
 const require = createRequire(import.meta.url);
-const admin = require('firebase-admin');
+const adminModule = require('firebase-admin');
+const admin = adminModule?.default ?? adminModule;
 
 const DEV = process.env.NODE_ENV !== 'production';
 
@@ -17,7 +18,7 @@ function parseJsonCandidate(value, fallback = null) {
 }
 
 export function getFirebaseAdmin() {
-  const activeApps = admin.apps;
+  const activeApps = admin.apps ?? [];
   const app = activeApps.length ? activeApps[0] : admin.initializeApp({ credential: buildCredential() });
 
   return {
