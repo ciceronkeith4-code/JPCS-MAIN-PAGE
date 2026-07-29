@@ -219,23 +219,38 @@ export function initStore() {
   saveCache(KEYS.curriculum, DEFAULT_CURRICULUM);
 
   if (isFirebaseConfigured()) {
-    // Setup Firestore Realtime subscriptions (replaces Supabase postgres_changes channels)
-    if (APP_CONFIG.features.Realtime) {
-      const tables = ["users", "announcements", "semesters", "subjects", "curriculum", "award_settings"];
-      tables.forEach((table) => {
-        onSnapshot(collection(db, table), () => {
-          syncFromFirebase().catch(console.error);
-        });
-      });
-    }
+    let unsubscribers: (() => void)[] = [];
 
     onAuthStateChanged(auth, (firebaseUser) => {
       if (import.meta.env.DEV) {
         console.debug("Firebase auth state changed", { userId: firebaseUser?.uid });
       }
-    });
 
-    syncFromFirebase().catch(console.error);
+      // Clean up previous listeners
+      unsubscribers.forEach((unsub) => unsub());
+      unsubscribers = [];
+
+      if (firebaseUser) {
+        // Authenticated user exists: start sync and listeners
+        syncFromFirebase().catch(console.error);
+
+        if (APP_CONFIG.features.Realtime) {
+          const tables = ["users", "announcements", "semesters", "subjects", "curriculum", "award_settings"];
+          tables.forEach((table) => {
+            const unsub = onSnapshot(
+              collection(db, table),
+              () => {
+                syncFromFirebase().catch(console.error);
+              },
+              (error) => {
+                console.warn(`Firestore real-time subscription error for ${table}:`, error.message);
+              }
+            );
+            unsubscribers.push(unsub);
+          });
+        }
+      }
+    });
   }
 }
 
