@@ -291,11 +291,8 @@ export function RegisterPage({ onAuth }: AuthProps) {
     }
   };
 
-  const handleProceedToDashboard = () => {
-    if (createdUser) {
-      onAuth(createdUser);
-      navigate("/dashboard");
-    }
+  const handleProceedToSignIn = () => {
+    navigate("/login");
   };
 
   return (
@@ -327,8 +324,8 @@ export function RegisterPage({ onAuth }: AuthProps) {
             >
               📧 Open Gmail Inbox
             </a>
-            <Button variant="outline" size="lg" className="w-full" onClick={handleProceedToDashboard}>
-              Continue to Portal
+            <Button variant="outline" size="lg" className="w-full" onClick={handleProceedToSignIn}>
+              Proceed to Sign In
             </Button>
           </div>
         </div>

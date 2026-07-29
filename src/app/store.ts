@@ -8,7 +8,7 @@ import {
   writeBatch,
   onSnapshot,
 } from "firebase/firestore";
-import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification, signOut as firebaseSignOut } from "firebase/auth";
 import { APP_CONFIG } from "./config/app.config";
 import { AuthService, type LoginEmailStatus } from "./services/auth.service";
 import { ProfileService } from "./services/profile.service";
@@ -491,22 +491,36 @@ export function logout() {
 }
 
 export async function register(data: Omit<User, "id" | "role"> & { password: string }): Promise<{ user: User | null; error?: string }> {
+  console.log("Starting registration process...");
   try {
     let finalId = uid();
+    let credential: any = null;
 
     if (isFirebaseConfigured()) {
+      console.log("Creating account...");
       try {
-        const credential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        credential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        console.log("Account created. UID:", credential.user.uid);
         finalId = credential.user.uid;
+      } catch (authErr: any) {
+        console.error("Firebase auth signUp error. Complete error object:", authErr);
+        return { user: null, error: authErr.message || "Registration failed during account creation." };
+      }
+
+      console.log("Sending verification email...");
+      try {
+        await sendEmailVerification(credential.user);
+        console.log("Verification email successfully sent");
+      } catch (emailErr: any) {
+        console.error("Verification email failed to send. Complete error object:", emailErr);
+        // Clean up the registered auth user so they can attempt registration again
         try {
-          await sendEmailVerification(credential.user);
-          if (import.meta.env.DEV) console.debug("Firebase verification email dispatched.");
-        } catch (emailErr: any) {
-          console.warn("Firebase sendEmailVerification error:", emailErr.message);
+          await credential.user.delete();
+          console.log("Cleaned up Auth account due to email failure.");
+        } catch (cleanupErr) {
+          console.error("Failed to clean up Auth account:", cleanupErr);
         }
-      } catch (signUpError: any) {
-        console.warn("Firebase auth signUp error:", signUpError.message);
-        return { user: null, error: signUpError.message || "Registration failed." };
+        return { user: null, error: emailErr.message || "Failed to send verification email. Please verify your email address is correct." };
       }
     }
 
@@ -517,44 +531,106 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
     saveCache(KEYS.users, [...currentUsers, newUser]);
 
     // Persist user profile to Firestore
-    if (isFirebaseConfigured()) {
+    if (isFirebaseConfigured() && credential) {
+      console.log("Creating Firestore profile...");
       try {
         await setDoc(doc(db, "users", finalId), newUser);
-      } catch (err) {
-        console.warn("Firebase user doc creation error:", err);
+        console.log("Firestore profile created");
+      } catch (dbErr: any) {
+        console.error("Firestore profile creation failed. Complete error object:", dbErr);
+        // Clean up Auth user if Firestore doc creation fails
+        try {
+          await credential.user.delete();
+          console.log("Cleaned up Auth account due to database write failure.");
+        } catch (cleanupErr) {
+          console.error("Failed to clean up Auth account:", cleanupErr);
+        }
+        return { user: null, error: dbErr.message || "Failed to save user profile. Please try again." };
       }
-    }
 
-    // Regular student auto-seed
-    if (data.year_level && data.year_level !== "Irregular") {
-      const targetYearNum = parseInt(data.year_level) || 1;
-      const curriculum = loadCache<CurriculumItem[]>(KEYS.curriculum, DEFAULT_CURRICULUM);
-      const sem1 = addSemester({ user_id: newUser.id, academic_year: "2025–2026", semester: "First Semester" });
+      // Regular student auto-seed
+      if (data.year_level && data.year_level !== "Irregular") {
+        console.log("Auto-seeding regular student semesters and subjects...");
+        const targetYearNum = parseInt(data.year_level) || 1;
+        const curriculum = loadCache<CurriculumItem[]>(KEYS.curriculum, DEFAULT_CURRICULUM);
+        
+        const semId = uid();
+        const sem: Semester = {
+          id: semId,
+          user_id: newUser.id,
+          academic_year: "2025–2026",
+          semester: "First Semester"
+        };
 
-      const matching = curriculum.filter(
-        (c) => c.course === data.course && String(c.year_level) === String(targetYearNum) && c.semester === "First Semester"
-      );
+        // Cache locally first
+        const allSems = loadCache<Semester[]>(KEYS.semesters, []);
+        saveCache(KEYS.semesters, [...allSems, sem]);
 
-      const subjectsToInsert: Subject[] = matching.map((item) => ({
-        id: uid(),
-        semester_id: sem1.id,
-        subject_code: item.subject_code,
-        subject_name: item.subject_name,
-        units: item.units,
-        grade: 0,
-        status: "Graded",
-      }));
+        // Save to Firestore (Awaited!)
+        try {
+          const semRes = await SemesterService.add(sem);
+          if (!semRes.success) {
+            throw new Error(semRes.error || "Failed to add initial semester.");
+          }
+          console.log("Firestore initial semester created");
+        } catch (semErr: any) {
+          console.error("Semester doc creation failed. Complete error object:", semErr);
+          // Clean up Auth user
+          try {
+            await credential.user.delete();
+            console.log("Cleaned up Auth account due to semester write failure.");
+          } catch (cleanupErr) {
+            console.error("Failed to clean up Auth account:", cleanupErr);
+          }
+          return { user: null, error: semErr.message || "Failed to save initial academic record." };
+        }
 
-      const allSubs = loadCache<Subject[]>(KEYS.subjects, []);
-      saveCache(KEYS.subjects, [...allSubs, ...subjectsToInsert]);
+        const matching = curriculum.filter(
+          (c) => c.course === data.course && String(c.year_level) === String(targetYearNum) && c.semester === "First Semester"
+        );
 
-      if (isFirebaseConfigured()) {
-        await SubjectService.bulkAdd(subjectsToInsert);
+        const subjectsToInsert: Subject[] = matching.map((item) => ({
+          id: uid(),
+          semester_id: semId,
+          subject_code: item.subject_code,
+          subject_name: item.subject_name,
+          units: item.units,
+          grade: 0,
+          status: "Graded",
+        }));
+
+        // Cache locally first
+        const allSubs = loadCache<Subject[]>(KEYS.subjects, []);
+        saveCache(KEYS.subjects, [...allSubs, ...subjectsToInsert]);
+
+        // Save to Firestore (Awaited!)
+        try {
+          const subRes = await SubjectService.bulkAdd(subjectsToInsert);
+          if (!subRes.success) {
+            throw new Error(subRes.error || "Failed to add initial subjects.");
+          }
+          console.log("Firestore initial subjects created");
+        } catch (subErr: any) {
+          console.error("Subject docs creation failed. Complete error object:", subErr);
+          // Clean up Auth user
+          try {
+            await credential.user.delete();
+            console.log("Cleaned up Auth account due to subject write failure.");
+          } catch (cleanupErr) {
+            console.error("Failed to clean up Auth account:", cleanupErr);
+          }
+          return { user: null, error: subErr.message || "Failed to save initial academic records." };
+        }
       }
+
+      console.log("Signing out user to enforce verification on next login...");
+      await firebaseSignOut(auth);
+      console.log("Registration completed");
     }
 
     return { user: newUser };
   } catch (err: any) {
+    console.error("Unexpected registration error. Complete error object:", err);
     return { user: null, error: err?.message || "Registration failed" };
   }
 }
