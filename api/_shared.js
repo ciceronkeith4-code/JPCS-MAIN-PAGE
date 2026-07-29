@@ -1,8 +1,9 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore as getAdminFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
+
+const require = createRequire(import.meta.url);
+const admin = require('firebase-admin');
 
 const DEV = process.env.NODE_ENV !== 'production';
 
@@ -16,14 +17,17 @@ function parseJsonCandidate(value, fallback = null) {
 }
 
 export function getFirebaseAdmin() {
-  const activeApps = getApps();
-  const app = activeApps.length ? activeApps[0] : initializeApp({ credential: buildCredential() });
+  const activeApps = admin.apps;
+  const app = activeApps.length ? activeApps[0] : admin.initializeApp({ credential: buildCredential() });
 
   return {
     app,
-    auth: () => getAdminAuth(app),
-    firestore: Object.assign(() => getAdminFirestore(app), { FieldValue, Timestamp }),
-    apps: getApps(),
+    auth: () => admin.auth(app),
+    firestore: Object.assign(() => admin.firestore(app), {
+      FieldValue: admin.firestore.FieldValue,
+      Timestamp: admin.firestore.Timestamp,
+    }),
+    apps: admin.apps,
   };
 }
 
@@ -35,7 +39,7 @@ function buildCredential() {
     if (!serviceAccount) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
     }
-    return cert(serviceAccount);
+    return admin.credential.cert(serviceAccount);
   }
 
   const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
@@ -44,14 +48,14 @@ function buildCredential() {
     if (!serviceAccount) {
       throw new Error('service-account.json is invalid JSON.');
     }
-    return cert(serviceAccount);
+    return admin.credential.cert(serviceAccount);
   }
 
   throw new Error('Firebase Admin service account is missing. Set FIREBASE_SERVICE_ACCOUNT or provide service-account.json for local development.');
 }
 
 export function getFirestore() {
-  return getAdminFirestore(getFirebaseAdmin().app);
+  return admin.firestore(getFirebaseAdmin().app);
 }
 
 export async function readRequestBody(req) {
