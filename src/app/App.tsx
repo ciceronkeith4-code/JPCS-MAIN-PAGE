@@ -12,6 +12,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 const AppLayout = lazy(() => import("./pages/layout").then(module => ({ default: module.AppLayout })));
 const LoginPage = lazy(() => import("./pages/auth").then(module => ({ default: module.LoginPage })));
 const RegisterPage = lazy(() => import("./pages/auth").then(module => ({ default: module.RegisterPage })));
+const VerifyEmailPage = lazy(() => import("./pages/auth").then(module => ({ default: module.VerifyEmailPage })));
 const ForgotPasswordPage = lazy(() => import("./pages/auth").then(module => ({ default: module.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import("./pages/auth").then(module => ({ default: module.ResetPasswordPage })));
 const PublicSiteLayout = lazy(() => import("./public-site/components").then(module => ({ default: module.PublicSiteLayout })));
@@ -246,6 +247,7 @@ export default function App() {
             </Route>
 
             {/* Auth routes */}
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button, Input, Select, Alert, Tabs } from "../components/ui";
 import { checkLoginEmail, login, register, sendPasswordResetEmail, resendVerification } from "../store";
 import { auth } from "../../firebase/config";
@@ -669,5 +669,95 @@ function AuthLayout({ children, wide, publicChrome = false }: { children: React.
         Secure access for enrolled students of San Sebastian College–Recoletos Manila.
       </p>
     </div>
+  );
+}
+
+export function VerifyEmailPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (!token) {
+      setStatus("error");
+      setErrorMessage("Verification token is missing. Please check your verification link.");
+      return;
+    }
+
+    const performVerification = async () => {
+      try {
+        const response = await fetch("/api/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          setStatus("success");
+        } else {
+          setStatus("error");
+          setErrorMessage(data.error || "Verification failed. The token may be expired or already used.");
+        }
+      } catch (err: any) {
+        setStatus("error");
+        setErrorMessage(err.message || "An unexpected error occurred during email verification.");
+      }
+    };
+
+    performVerification();
+  }, [token]);
+
+  return (
+    <AuthLayout publicChrome>
+      <div className="py-4 text-center">
+        {status === "loading" && (
+          <div className="flex flex-col items-center py-6">
+            <div className="size-12 rounded-full border-4 border-slate-200 border-t-primary animate-spin mb-4" />
+            <h2 className="text-xl font-bold text-foreground mb-1">Verifying Your Email</h2>
+            <p className="text-xs text-muted-foreground">Please wait while we activate your account...</p>
+          </div>
+        )}
+
+        {status === "success" && (
+          <div className="flex flex-col items-center">
+            <div className="size-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-200 animate-bounce">
+              <svg className="size-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="m5 12 4 4L19 6" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-1">Email Verified!</h2>
+            <p className="text-xs text-muted-foreground mb-6">
+              Your account has been successfully verified and activated. You can now sign in to access the portal.
+            </p>
+            <Link to="/login" className="w-full">
+              <Button size="lg" className="w-full">
+                Proceed to Sign In
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="flex flex-col items-center">
+            <div className="size-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-200">
+              <svg className="size-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-1">Verification Failed</h2>
+            <p className="text-xs text-rose-600 font-semibold mb-4">{errorMessage}</p>
+            <p className="text-xs text-muted-foreground mb-6">
+              If the link expired, please log in with your credentials to request a new verification email.
+            </p>
+            <Link to="/login" className="w-full">
+              <Button variant="outline" size="lg" className="w-full">
+                Back to Sign In
+              </Button>
+            </Link>
+          </div>
+        )}
+      </div>
+    </AuthLayout>
   );
 }

@@ -57,20 +57,6 @@ export const AuthService = {
     try {
       const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const firebaseUser = credential.user;
-
-      // Reload user to get latest verification status from Firebase
-      await firebaseUser.reload();
-
-      // ── Email verification gate (Firebase Auth is the authoritative source) ──
-      if (!firebaseUser.emailVerified) {
-        await firebaseSignOut(auth);
-        return {
-          success: false,
-          data: null,
-          error: "Your email has not been verified. Please verify your email before logging in.",
-        };
-      }
-
       return { success: true, data: firebaseUser, error: null };
     } catch (err: any) {
       const isCredentialError = err?.code === "auth/invalid-credential"

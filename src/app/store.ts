@@ -454,7 +454,7 @@ export async function refreshSessionFromFirebase(): Promise<User | null> {
   if (!isFirebaseConfigured()) return getSession();
 
   const result = await ProfileService.fetchCurrent();
-  if (!result.success || !result.data) {
+  if (!result.success || !result.data || result.data.verified === false) {
     localStorage.removeItem(getCacheKey(KEYS.session));
     return null;
   }
@@ -485,68 +485,27 @@ export async function login(email: string, password: string): Promise<{ user: Us
       if (userSnap.exists()) {
         profile = { id: userId, ...userSnap.data() } as User;
         
-        // Ensure verified flag is true in local session
-        profile.verified = true;
+        if (profile.verified === false) {
+          console.warn("Unverified user login attempt blocked");
+          await firebaseSignOut(auth);
+          return {
+            user: null,
+            error: "Your email address has not been verified. Please check your inbox and verify your account.",
+          };
+        }
       } else {
-        // First verified login: retrieve details from pending_profiles
-        console.log("Verified login detected, loading pending profile details...");
+        // Checking if pending profile exists (meaning they registered but have not verified yet)
+        console.log("Checking if pending profile exists for verified login...");
         const pendingRef = doc(db, "pending_profiles", userId);
         const pendingSnap = await getDoc(pendingRef);
 
         if (pendingSnap.exists()) {
-          const pendingData = pendingSnap.data();
-          profile = { ...pendingData, id: userId, role: "student", verified: true } as User;
-
-          // Create official Firestore user profile
-          console.log("Migrating pending profile to users collection...");
-          await setDoc(userRef, profile);
-
-          // Seed semesters and subjects for regular students
-          if (profile.year_level && profile.year_level !== "Irregular") {
-            console.log("Auto-seeding academic records for verified student...");
-            const targetYearNum = parseInt(profile.year_level) || 1;
-            const curriculum = loadCache<CurriculumItem[]>(KEYS.curriculum, DEFAULT_CURRICULUM);
-            
-            const semId = uid();
-            const sem: Semester = {
-              id: semId,
-              user_id: userId,
-              academic_year: "2025–2026",
-              semester: "First Semester"
-            };
-
-            // Save to local cache first
-            const allSems = loadCache<Semester[]>(KEYS.semesters, []);
-            saveCache(KEYS.semesters, [...allSems, sem]);
-
-            // Save to Firestore
-            await SemesterService.add(sem);
-
-            const matching = curriculum.filter(
-              (c) => c.course === profile!.course && String(c.year_level) === String(targetYearNum) && c.semester === "First Semester"
-            );
-
-            const subjectsToInsert: Subject[] = matching.map((item) => ({
-              id: uid(),
-              semester_id: semId,
-              subject_code: item.subject_code,
-              subject_name: item.subject_name,
-              units: item.units,
-              grade: 0,
-              status: "Graded",
-            }));
-
-            // Save to local cache first
-            const allSubs = loadCache<Subject[]>(KEYS.subjects, []);
-            saveCache(KEYS.subjects, [...allSubs, ...subjectsToInsert]);
-
-            // Save to Firestore
-            await SubjectService.bulkAdd(subjectsToInsert);
-          }
-
-          // Delete temporary pending profile
-          await deleteDoc(pendingRef);
-          console.log("Pending profile deleted successfully.");
+          console.warn("Unverified user login blocked (still in pending_profiles)");
+          await firebaseSignOut(auth);
+          return {
+            user: null,
+            error: "Your email address has not been verified. Please check your inbox and verify your account.",
+          };
         } else {
           // Fallback if no pending profile document exists
           console.log("No pending profile found, creating default user doc...");
@@ -602,22 +561,6 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
         console.error("Firebase auth signUp error. Complete error object:", authErr);
         return { user: null, error: authErr.message || "Registration failed during account creation." };
       }
-
-      console.log("Sending verification email...");
-      try {
-        await sendEmailVerification(credential.user);
-        console.log("Verification email successfully sent");
-      } catch (emailErr: any) {
-        console.error("Verification email failed to send. Complete error object:", emailErr);
-        // Clean up the registered auth user so they can attempt registration again
-        try {
-          await credential.user.delete();
-          console.log("Cleaned up Auth account due to email failure.");
-        } catch (cleanupErr) {
-          console.error("Failed to clean up Auth account:", cleanupErr);
-        }
-        return { user: null, error: emailErr.message || "Failed to send verification email. Please verify your email address is correct." };
-      }
     }
 
     const newUser: User = { ...data, id: finalId, role: "student", verified: false };
@@ -642,6 +585,35 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
           console.error("Failed to clean up Auth account:", cleanupErr);
         }
         return { user: null, error: dbErr.message || "Failed to save registration details. Please try again." };
+      }
+
+      console.log("Sending verification email via Brevo custom api...");
+      try {
+        const emailRes = await fetch('/api/send-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: data.email,
+            uid: finalId,
+            fullName: data.full_name
+          })
+        });
+        const emailData = await emailRes.json();
+        if (!emailRes.ok) {
+          throw new Error(emailData.error || "Failed to send verification email.");
+        }
+        console.log("Verification email successfully sent via Brevo");
+      } catch (emailErr: any) {
+        console.error("Verification email failed to send. Complete error object:", emailErr);
+        // Clean up Auth user and pending profile document
+        try {
+          await deleteDoc(doc(db, "pending_profiles", finalId));
+          await credential.user.delete();
+          console.log("Cleaned up Auth account & pending profile due to email failure.");
+        } catch (cleanupErr) {
+          console.error("Failed to clean up:", cleanupErr);
+        }
+        return { user: null, error: emailErr.message || "Failed to send verification email. Please verify your email address is correct." };
       }
 
       console.log("Signing out user to enforce verification on next login...");
