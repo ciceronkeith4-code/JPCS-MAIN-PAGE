@@ -457,6 +457,40 @@ export function OfficerPhoto({
     }
   }, [profilePhoto, actionPhoto]);
 
+  useEffect(() => {
+    if (reduce) return;
+
+    const checkMobileAndObserve = () => {
+      const isMobile = window.matchMedia("(max-width: 768px)").matches;
+      if (!isMobile || !cardRef.current) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              setIsActive(true);
+            } else {
+              setIsActive(false);
+            }
+          });
+        },
+        {
+          rootMargin: "-30% 0px -30% 0px",
+          threshold: 0.2,
+        }
+      );
+
+      observer.observe(cardRef.current);
+      return observer;
+    };
+
+    const observerInstance = checkMobileAndObserve();
+
+    return () => {
+      if (observerInstance) observerInstance.disconnect();
+    };
+  }, [reduce]);
+
   const hasRealImages = !!(profilePhoto && actionPhoto);
 
   return (

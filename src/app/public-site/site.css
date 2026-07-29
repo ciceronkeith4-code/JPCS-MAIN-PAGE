@@ -418,11 +418,37 @@ a:hover .site-rolling > span:last-child { transform: translateY(0); }
   .site-home-features .site-feature-row .site-image-placeholder,
   .site-feature-section--compact .site-feature-row .site-image-placeholder,
   .site-values-section .site-feature-row .site-image-placeholder { min-height: auto; width: 100%; aspect-ratio: 16 / 10; }
-  .site-person { display: grid; grid-template-columns: 92px minmax(0, 1fr); column-gap: 1rem; align-items: start; padding-block: 1rem; border-top: 1px solid var(--line); }
-  .site-person .site-image-placeholder { grid-column: 1; grid-row: 1 / 7; min-height: 126px; width: 92px; aspect-ratio: 3 / 4; margin: 0; }
-  .site-person > :not(.site-image-placeholder) { grid-column: 2; }
-  .site-person h3 { margin-top: .25rem; font-size: 1rem; }
-  .site-person > p { margin-block: .45rem; }
+  .site-person {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-block: 2rem;
+    border-top: 1px solid var(--line);
+    width: 100%;
+  }
+  .site-person .officer-photo-container {
+    max-width: 280px;
+    width: 100%;
+    margin-inline: auto;
+    margin-bottom: 1.5rem;
+  }
+  .site-person h3 {
+    margin-top: 0.5rem;
+    font-size: 1.35rem;
+  }
+  .site-person > p {
+    max-width: 24rem;
+    margin-inline: auto;
+    margin-block: 0.5rem;
+    font-size: 0.88rem;
+  }
+  .site-person button {
+    justify-content: center;
+    width: 100%;
+    max-width: 240px;
+    margin-inline: auto;
+  }
   .site-footer__top { grid-template-columns: 1fr; }
   .site-footer__brand { grid-column: auto; }
   .site-footer__bottom { align-items: flex-start; flex-direction: column; }
