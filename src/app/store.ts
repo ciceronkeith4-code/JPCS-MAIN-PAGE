@@ -10,7 +10,7 @@ import {
   writeBatch,
   onSnapshot,
 } from "firebase/firestore";
-import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification, signOut as firebaseSignOut } from "firebase/auth";
+import { onAuthStateChanged, createUserWithEmailAndPassword, sendEmailVerification, signOut as firebaseSignOut, signInWithEmailAndPassword } from "firebase/auth";
 import { APP_CONFIG } from "./config/app.config";
 import { AuthService, type LoginEmailStatus } from "./services/auth.service";
 import { ProfileService } from "./services/profile.service";
