@@ -2,9 +2,9 @@ import React, { useState, useEffect } from "react";
 import { PageHeader, EmptyState } from "../components/ui";
 import { getAllUsers } from "../store";
 import type { User } from "../types";
+import { OfficerPhoto } from "../public-site/components";
 
 function OfficerPhotoCard({ officer, index }: { officer: User; index: number }) {
-  const [isHovered, setIsHovered] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
 
   // Fallbacks for demo officer (Keith)
@@ -15,8 +15,6 @@ function OfficerPhotoCard({ officer, index }: { officer: User; index: number }) 
 
   const profileImg = officer.profile_photo || defaultProfile;
   const actionImg = officer.action_photo || defaultAction || profileImg;
-
-  const currentImg = isHovered && actionImg ? actionImg : profileImg;
 
   const getBadgeStyle = (pos: string) => {
     if (pos === "President") return "bg-amber-100 text-amber-955 border-amber-300";
@@ -34,39 +32,19 @@ function OfficerPhotoCard({ officer, index }: { officer: User; index: number }) 
     <>
       <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs hover:shadow-lg hover:border-slate-300 transition-all duration-300 flex flex-col justify-between group">
         {/* Top Image Frame with Hover / Drag Animation */}
-        <div
-          className="relative aspect-4/5 w-full bg-slate-100 overflow-hidden cursor-pointer select-none"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          onMouseMove={() => setIsHovered(true)}
-          onTouchStart={() => setIsHovered(true)}
-          onTouchEnd={() => setIsHovered(false)}
-          onClick={() => setShowDetail(true)}
-        >
+        <div className="relative w-full aspect-4/5 select-none">
           {/* Rank Number Badge #1, #2 */}
-          <div className="absolute top-3 left-3 z-10 size-8 rounded-full bg-slate-950/80 backdrop-blur-xs text-white text-xs font-black flex items-center justify-center shadow-xs">
+          <div className="absolute top-3 left-3 z-30 size-8 rounded-full bg-slate-950/80 backdrop-blur-xs text-white text-xs font-black flex items-center justify-center shadow-xs">
             #{index + 1}
           </div>
 
-          {/* Officer Image (Swaps seamlessly between Profile & Action photo on hover/drag) */}
-          {currentImg ? (
-            <img
-              src={currentImg}
-              alt={officer.full_name}
-              className={`size-full object-cover object-top transition-all duration-500 ease-out transform ${
-                isHovered ? "scale-105 filter brightness-105" : "scale-100"
-              }`}
-            />
-          ) : (
-            <div className="size-full bg-slate-200 flex items-center justify-center text-slate-400 font-bold text-3xl">
-              {initials}
-            </div>
-          )}
-
-          {/* Pose Indicator Tag */}
-          <div className="absolute bottom-2.5 right-2.5 bg-slate-950/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs transition-opacity duration-200">
-            {isHovered ? "Action Pose" : "Hover / Click Details"}
-          </div>
+          <OfficerPhoto
+            name={officer.full_name}
+            role={officer.officer_position || "Officer"}
+            profilePhoto={profileImg || undefined}
+            actionPhoto={actionImg || undefined}
+            index={index}
+          />
         </div>
 
         {/* Card Content Footer */}

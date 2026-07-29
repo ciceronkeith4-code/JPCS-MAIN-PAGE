@@ -62,19 +62,19 @@ export const values: Feature[] = [
 ];
 
 export const officers = [
-  { name: "Keith Ciceron", role: "President", course: "BSIT · 4th Year", responsibility: "Sets the department direction, leads student initiatives, and supports every team." },
-  { name: "Karl Tristan", role: "Vice President", course: "BSIT · 4th Year", responsibility: "Coordinates academic programs and strengthens internal officer collaboration." },
-  { name: "Andrei Baguisa", role: "Secretary", course: "BSIT · 3rd Year", responsibility: "Keeps department communications, schedules, and official records dependable." },
+  { name: "Keith Czimonne Anderson Ciceron", role: "President", course: "BSIT · 4th Year", responsibility: "Sets the department direction, leads student initiatives, and supports every team.", profile_photo: "/officers/ciceron_profile.png", action_photo: "/officers/ciceron_action.jpg" },
+  { name: "Karl Tristan Benedicto", role: "Vice President", course: "BSIT · 4th Year", responsibility: "Coordinates academic programs and strengthens internal officer collaboration.", profile_photo: "/officers/benedicto_profile.png", action_photo: "/officers/benedicto_action.jpg" },
+  { name: "Andrei Baguisa", role: "Secretary", course: "BSIT · 3rd Year", responsibility: "Keeps department communications, schedules, and official records dependable.", profile_photo: "/officers/baguisa_profile.jpg", action_photo: "/officers/baguisa_action.jpg" },
   { name: "Kenneth Gregorio", role: "Treasurer", course: "BSIT · 3rd Year", responsibility: "Stewards department funds, budget planning, and resources with clarity and care." },
   { name: "Khemuel Timkang", role: "Auditor", course: "BSIT · 3rd Year", responsibility: "Maintains transparency and conducts audits for all department activities." },
   { name: "Von Dimaculangan", role: "P.R.O.", course: "BSIT · 3rd Year", responsibility: "Manages public relations, announcements, and external communications." },
   { name: "John Carl Arche", role: "Technical Head", course: "BSIT · 3rd Year", responsibility: "Directs technical workshops, hands-on bootcamps, and developer support." },
   { name: "Lance Alvarez Ceasar", role: "Content Manager", course: "BSIT · 2nd Year", responsibility: "Curates, edits, and designs creative digital media content for the department." },
-  { name: "JD Pagkatipunan", role: "Head of Sports", course: "BSIT · 3rd Year", responsibility: "Organizes sports fests, computing e-sports, and physical fitness activities." },
+  { name: "JD Pagkatipunan", role: "Head of Sports", course: "BSIT · 3rd Year", responsibility: "Organizes sports fests, computing e-sports, and physical fitness activities.", profile_photo: "/officers/pagkatipunan_profile.jpg", action_photo: "/officers/pagkatipunan_action.jpg" },
   { name: "Lucian Corvinus", role: "4th Yr Representative", course: "BSIT · 4th Year", responsibility: "Represents the senior class, assisting fourth-year students with graduation requirements." },
-  { name: "Kenneth Fernandez", role: "3rd Yr Representative", course: "BSIT · 3rd Year", responsibility: "Coordinates with third-year class sections for department events and workshops." },
+  { name: "Kenneth Fernandez", role: "3rd Yr Representative", course: "BSIT · 3rd Year", responsibility: "Coordinates with third-year class sections for department events and workshops.", profile_photo: "/officers/fernandez_profile.jpg", action_photo: "/officers/fernandez_action.jpg" },
   { name: "Ruth Geras", role: "2nd Yr Representative", course: "BSIT · 2nd Year", responsibility: "Coordinates with second-year class sections and supports peer learning circles." },
-  { name: "Jam Morales", role: "1st Yr Representative", course: "BSIT · 1st Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community." },
+  { name: "Jam Morales", role: "1st Yr Representative", course: "BSIT · 1st Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community.", profile_photo: "/officers/morales_profile.png", action_photo: "/officers/morales_action.png" },
 ];
 
 export const seo = {
