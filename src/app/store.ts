@@ -232,8 +232,8 @@ export function initStore() {
       unsubscribers.forEach((unsub) => unsub());
       unsubscribers = [];
 
-      if (firebaseUser) {
-        // Authenticated user exists: start sync and listeners
+      if (firebaseUser && firebaseUser.emailVerified) {
+        // Authenticated and verified user exists: start sync and listeners
         syncFromFirebase().catch(console.error);
 
         if (APP_CONFIG.features.Realtime) {
