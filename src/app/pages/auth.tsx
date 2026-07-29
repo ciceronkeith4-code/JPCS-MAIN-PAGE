@@ -320,8 +320,8 @@ export function RegisterPage({ onAuth }: AuthProps) {
     if (!form.year_level) e.year_level = "Please select your year level.";
     
     const emailLower = form.email.trim().toLowerCase();
-    if (!emailLower.endsWith("@sscrmnl.edu.ph") && !emailLower.endsWith("@student.sscr.edu.ph")) {
-      e.email = "Only official institutional emails ending with @sscrmnl.edu.ph are accepted.";
+    if (!emailLower.includes("@")) {
+      e.email = "Please enter a valid email address.";
     }
 
     if (form.password.length < 8) e.password = "Password must be at least 8 characters.";
@@ -445,8 +445,8 @@ export function ForgotPasswordPage() {
       setError("Please enter your official email address.");
       return;
     }
-    if (!emailLower.endsWith("@sscrmnl.edu.ph") && !emailLower.endsWith("@student.sscr.edu.ph")) {
-      setError("Please enter an official institutional email ending with @sscrmnl.edu.ph.");
+    if (!emailLower.includes("@")) {
+      setError("Please enter a valid email address.");
       return;
     }
 
