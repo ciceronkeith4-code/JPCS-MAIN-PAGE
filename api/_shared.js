@@ -1,4 +1,6 @@
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore as getAdminFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -14,46 +16,42 @@ function parseJsonCandidate(value, fallback = null) {
 }
 
 export function getFirebaseAdmin() {
-  const activeApps = typeof admin.getApps === 'function'
-    ? admin.getApps()
-    : Array.isArray(admin.apps)
-      ? admin.apps
-      : [];
+  const activeApps = getApps();
+  const app = activeApps.length ? activeApps[0] : initializeApp({ credential: buildCredential() });
 
-  if (activeApps.length) {
-    return admin;
-  }
+  return {
+    app,
+    auth: () => getAdminAuth(app),
+    firestore: Object.assign(() => getAdminFirestore(app), { FieldValue, Timestamp }),
+    apps: getApps(),
+  };
+}
 
+function buildCredential() {
   const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  let credential = null;
 
   if (serviceAccountRaw) {
     const serviceAccount = parseJsonCandidate(serviceAccountRaw);
     if (!serviceAccount) {
       throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
     }
-    credential = admin.credential.cert(serviceAccount);
-  } else {
-    const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
-    if (fs.existsSync(serviceAccountPath)) {
-      const serviceAccount = parseJsonCandidate(fs.readFileSync(serviceAccountPath, 'utf8'));
-      if (!serviceAccount) {
-        throw new Error('service-account.json is invalid JSON.');
-      }
-      credential = admin.credential.cert(serviceAccount);
+    return cert(serviceAccount);
+  }
+
+  const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
+  if (fs.existsSync(serviceAccountPath)) {
+    const serviceAccount = parseJsonCandidate(fs.readFileSync(serviceAccountPath, 'utf8'));
+    if (!serviceAccount) {
+      throw new Error('service-account.json is invalid JSON.');
     }
+    return cert(serviceAccount);
   }
 
-  if (!credential) {
-    throw new Error('Firebase Admin service account is missing. Set FIREBASE_SERVICE_ACCOUNT or provide service-account.json for local development.');
-  }
-
-  admin.initializeApp({ credential });
-  return admin;
+  throw new Error('Firebase Admin service account is missing. Set FIREBASE_SERVICE_ACCOUNT or provide service-account.json for local development.');
 }
 
 export function getFirestore() {
-  return getFirebaseAdmin().firestore();
+  return getAdminFirestore(getFirebaseAdmin().app);
 }
 
 export async function readRequestBody(req) {
