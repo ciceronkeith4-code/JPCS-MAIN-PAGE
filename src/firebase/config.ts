@@ -14,15 +14,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-console.log("Firebase Diagnostic Setup:", {
-  apiKeyLength: firebaseConfig.apiKey?.length || 0,
-  authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId,
-  storageBucket: firebaseConfig.storageBucket,
-  messagingSenderId: firebaseConfig.messagingSenderId,
-  appId: firebaseConfig.appId,
-});
-
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);

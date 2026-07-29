@@ -20,6 +20,7 @@ import { CurriculumService } from "./services/curriculum.service";
 import { AnnouncementService } from "./services/announcement.service";
 import { StorageService } from "./services/storage.service";
 import { applyCurriculumSchedule } from "./schedule";
+import { extractApiMessage, readJsonResponse } from "./utils/http";
 
 const KEYS = {
   users: "sscr_users",
@@ -546,19 +547,16 @@ export function logout() {
 }
 
 export async function register(data: Omit<User, "id" | "role"> & { password: string }): Promise<{ user: User | null; error?: string }> {
-  console.log("Starting registration process...");
   try {
     let finalId = uid();
     let credential: any = null;
 
     if (isFirebaseConfigured()) {
-      console.log("Creating account...");
       try {
         credential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-        console.log("Account created. UID:", credential.user.uid);
         finalId = credential.user.uid;
       } catch (authErr: any) {
-        console.error("Firebase auth signUp error. Complete error object:", authErr);
+        console.error("Firebase auth signUp error:", authErr);
         return { user: null, error: authErr.message || "Registration failed during account creation." };
       }
     }
@@ -571,76 +569,38 @@ export async function register(data: Omit<User, "id" | "role"> & { password: str
 
     // Save registration details to pending_profiles instead of users collection
     if (isFirebaseConfigured() && credential) {
-      console.log("Saving details to pending_profiles...");
       try {
         await setDoc(doc(db, "pending_profiles", finalId), newUser);
-        console.log("Pending profile details saved");
       } catch (dbErr: any) {
-        console.error("Firestore pending profile creation failed. Complete error object:", dbErr);
+        console.error("Firestore pending profile creation failed:", dbErr);
         // Clean up Auth user if Firestore doc creation fails
         try {
           await credential.user.delete();
-          console.log("Cleaned up Auth account due to database write failure.");
         } catch (cleanupErr) {
           console.error("Failed to clean up Auth account:", cleanupErr);
         }
         return { user: null, error: dbErr.message || "Failed to save registration details. Please try again." };
       }
-
-      console.log("Sending verification email via Brevo custom api...");
-      try {
-        const emailRes = await fetch('/api/send-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: data.email,
-            uid: finalId,
-            fullName: data.full_name
-          })
-        });
-        const emailData = await emailRes.json();
-        if (!emailRes.ok) {
-          throw new Error(emailData.error || "Failed to send verification email.");
-        }
-        console.log("Verification email successfully sent via Brevo");
-      } catch (emailErr: any) {
-        console.error("Verification email failed to send. Complete error object:", emailErr);
-        // Clean up Auth user and pending profile document
-        try {
-          await deleteDoc(doc(db, "pending_profiles", finalId));
-          await credential.user.delete();
-          console.log("Cleaned up Auth account & pending profile due to email failure.");
-        } catch (cleanupErr) {
-          console.error("Failed to clean up:", cleanupErr);
-        }
-        return { user: null, error: emailErr.message || "Failed to send verification email. Please verify your email address is correct." };
-      }
-
-      console.log("Signing out user to enforce verification on next login...");
-      await firebaseSignOut(auth);
-      console.log("Registration completed");
     }
 
     return { user: newUser };
   } catch (err: any) {
-    console.error("Unexpected registration error. Complete error object:", err);
+    console.error("Unexpected registration error:", err);
     return { user: null, error: err?.message || "Registration failed" };
   }
 }
 
 export async function resendVerification(email: string, _password?: string): Promise<{ success: boolean; error?: string }> {
-  console.log("Resending verification email via Brevo for:", email);
   try {
     const response = await fetch('/api/resend-verification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim().toLowerCase() })
     });
-    const data = await response.json();
+    const { data, text } = await readJsonResponse(response);
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to resend verification email.');
+      throw new Error(extractApiMessage(data, text || 'Failed to resend verification email.'));
     }
-    console.log("Resend verification email dispatched via Brevo.");
     return { success: true };
   } catch (err: any) {
     console.error("Resend verification email failed:", err);
@@ -1163,18 +1123,16 @@ export function deleteUser(id: string) {
 }
 
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
-  console.log("Sending password reset email via Brevo for:", email);
   try {
     const response = await fetch('/api/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim().toLowerCase() })
     });
-    const data = await response.json();
+    const { data, text } = await readJsonResponse(response);
     if (!response.ok) {
-      throw new Error(data.error || 'Failed to send password reset email.');
+      throw new Error(extractApiMessage(data, text || 'Failed to send password reset email.'));
     }
-    console.log("Password reset email dispatched via Brevo.");
     return { success: true };
   } catch (err: any) {
     console.error("Password reset email failed:", err);

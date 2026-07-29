@@ -93,9 +93,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(() => getSession());
   const [envValid, setEnvValid] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
-  const isPublicSite = ["/", "/programs", "/community", "/about", "/testimonials"].includes(window.location.pathname);
-
-  console.log("App component render. User:", user, "envValid:", envValid);
+  const isPublicOrAuthRoute = ["/", "/programs", "/community", "/about", "/testimonials", "/login", "/register", "/verify-email", "/forgot-password", "/reset-password"].includes(window.location.pathname);
 
 
   useEffect(() => {
@@ -219,11 +217,11 @@ export default function App() {
     };
   }, [user?.id]);
 
-  if (!envValid && !isPublicSite) {
+  if (!envValid && !isPublicOrAuthRoute) {
     return <EnvErrorScreen />;
   }
 
-  if (authLoading && !isPublicSite) {
+  if (authLoading && !isPublicOrAuthRoute) {
     return <PageSkeleton />;
   }
 

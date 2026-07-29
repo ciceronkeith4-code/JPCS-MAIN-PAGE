@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button, Input, Select, Alert, Tabs } from "../components/ui";
 import { checkLoginEmail, login, register, sendPasswordResetEmail, resendVerification } from "../store";
+import { extractApiMessage, readJsonResponse } from "../utils/http";
 import type { User } from "../types";
 
 interface AuthProps {
@@ -345,6 +346,10 @@ export function RegisterPage({ onAuth }: AuthProps) {
       }
       setCreatedUser(res.user);
       setConfirmationSent(true);
+      navigate(
+        `/verify-email?mode=registration&uid=${encodeURIComponent(res.user.id)}&email=${encodeURIComponent(res.user.email)}&fullName=${encodeURIComponent(res.user.full_name)}`,
+        { replace: true },
+      );
     } catch (err) {
       setLoading(false);
       setServerError("An error occurred during registration. Please try again.");
@@ -546,9 +551,9 @@ export function ResetPasswordPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword })
       });
-      const data = await response.json();
+      const { data, text } = await readJsonResponse(response);
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to reset password.');
+        throw new Error(extractApiMessage(data, text || 'Failed to reset password.'));
       }
       setSuccess(true);
     } catch (err: any) {
@@ -643,10 +648,42 @@ function AuthLayout({ children, wide, publicChrome = false }: { children: React.
 export function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
+  const mode = searchParams.get("mode");
+  const uid = searchParams.get("uid") || "";
+  const email = searchParams.get("email") || "";
+  const fullName = searchParams.get("fullName") || "";
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    if (mode === "registration") {
+      const sendVerification = async () => {
+        try {
+          if (!uid || !email || !fullName) {
+            throw new Error("Registration details are missing. Please register again.");
+          }
+
+          const response = await fetch("/api/send-verification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ uid, email, fullName }),
+          });
+          const { data, text } = await readJsonResponse(response);
+          if (!response.ok) {
+            throw new Error(extractApiMessage(data, text || "Failed to send verification email."));
+          }
+          setStatus("success");
+          void import("../store").then(({ logout }) => logout());
+        } catch (err: any) {
+          setStatus("error");
+          setErrorMessage(err.message || "An unexpected error occurred while sending the verification email.");
+        }
+      };
+
+      void sendVerification();
+      return;
+    }
+
     if (!token) {
       setStatus("error");
       setErrorMessage("Verification token is missing. Please check your verification link.");
@@ -660,12 +697,12 @@ export function VerifyEmailPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
         });
-        const data = await response.json();
+        const { data, text } = await readJsonResponse(response);
         if (response.ok && data.success) {
           setStatus("success");
         } else {
           setStatus("error");
-          setErrorMessage(data.error || "Verification failed. The token may be expired or already used.");
+          setErrorMessage(extractApiMessage(data, text || "Verification failed. The token may be expired or already used."));
         }
       } catch (err: any) {
         setStatus("error");
@@ -674,12 +711,20 @@ export function VerifyEmailPage() {
     };
 
     performVerification();
-  }, [token]);
+  }, [token, mode, uid, email, fullName]);
 
   return (
     <AuthLayout publicChrome>
       <div className="py-4 text-center">
-        {status === "loading" && (
+        {status === "loading" && mode === "registration" && (
+          <div className="flex flex-col items-center py-6">
+            <div className="size-12 rounded-full border-4 border-slate-200 border-t-primary animate-spin mb-4" />
+            <h2 className="text-xl font-bold text-foreground mb-1">Preparing Your Verification Email</h2>
+            <p className="text-xs text-muted-foreground">We are sending the verification link now.</p>
+          </div>
+        )}
+
+        {status === "loading" && mode !== "registration" && (
           <div className="flex flex-col items-center py-6">
             <div className="size-12 rounded-full border-4 border-slate-200 border-t-primary animate-spin mb-4" />
             <h2 className="text-xl font-bold text-foreground mb-1">Verifying Your Email</h2>
@@ -694,13 +739,17 @@ export function VerifyEmailPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="m5 12 4 4L19 6" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-foreground mb-1">Email Verified!</h2>
+            <h2 className="text-xl font-bold text-foreground mb-1">
+              {mode === "registration" ? "Verification Email Sent!" : "Email Verified!"}
+            </h2>
             <p className="text-xs text-muted-foreground mb-6">
-              Your account has been successfully verified and activated. You can now sign in to access the portal.
+              {mode === "registration"
+                ? "Check your inbox for the verification link. We have signed you out for security."
+                : "Your account has been successfully verified and activated. You can now sign in to access the portal."}
             </p>
             <Link to="/login" className="w-full">
               <Button size="lg" className="w-full">
-                Proceed to Sign In
+                {mode === "registration" ? "Continue to Sign In" : "Proceed to Sign In"}
               </Button>
             </Link>
           </div>
