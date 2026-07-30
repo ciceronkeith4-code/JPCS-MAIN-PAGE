@@ -121,28 +121,30 @@ export function LoginPage() {
 
     try {
       if (normalizedEmail === "admin@sscrmnl.edu.ph" && password === "admin010404") {
-        const fallbackAdminUser = {
-          id: "default_admin_id",
-          uid: "default_admin_id",
-          full_name: "System Administrator",
-          student_number: "ADMIN-000",
-          course: "BSIT",
-          year_level: "4",
-          role: "admin" as const,
-          email: "admin@sscrmnl.edu.ph",
-          verified: true,
-        };
-        const { saveCache } = await import("../store");
-        saveCache("sscr_session", fallbackAdminUser);
-        
+        let user;
         try {
-          await startEmailLogin(normalizedEmail, password);
+          user = await startEmailLogin(normalizedEmail, password);
         } catch {
-          // If Firebase login throws (account not created yet or net error), session is already saved
+          user = {
+            id: "vFsIfueElhVIPpOanZnvjmyeikE3",
+            uid: "vFsIfueElhVIPpOanZnvjmyeikE3",
+            full_name: "System Administrator",
+            student_number: "ADMIN-000",
+            course: "BSIT",
+            year_level: "4",
+            role: "admin" as const,
+            email: "admin@sscrmnl.edu.ph",
+            verified: true,
+          };
         }
-        
+        const { saveCache } = await import("../store");
+        saveCache("sscr_session", user);
         window.dispatchEvent(new Event("sscr_store_synced"));
-        navigate("/admin", { replace: true });
+        if (user.mustChangePassword) {
+          navigate("/change-password", { replace: true });
+        } else {
+          navigate("/admin", { replace: true });
+        }
         return;
       }
 
