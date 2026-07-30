@@ -390,7 +390,7 @@ export function LoginPage() {
                     variant="outline"
                     onClick={() => setIsApproved(false)}
                     disabled={loading}
-                    className="w-1/3 py-2.5 text-xs font-bold"
+                    className="flex-1 py-2.5 px-2 text-[11px] sm:text-xs font-bold whitespace-nowrap overflow-hidden text-ellipsis"
                   >
                     Change Email
                   </Button>
@@ -398,7 +398,7 @@ export function LoginPage() {
                     type="submit"
                     variant="primary"
                     disabled={loading}
-                    className="w-2/3 py-2.5 font-bold shadow-md bg-[#800000] hover:bg-[#660000] text-white transition-all min-h-[42px]"
+                    className="flex-[1.5] py-2.5 font-bold shadow-md bg-[#800000] hover:bg-[#660000] text-white transition-all min-h-[42px] text-xs sm:text-sm"
                   >
                     {loading ? (
                       <div className="flex items-center justify-center gap-2">

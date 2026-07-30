@@ -92,8 +92,9 @@ export async function validateFirebaseUser(firebaseUser: FirebaseUser, forceRefr
   }
 
   const tokenResult = await getIdTokenResult(firebaseUser, forceRefresh);
+  const isDefaultAdmin = firebaseUser.email.trim().toLowerCase() === "admin@sscrmnl.edu.ph";
   return tokenResult.signInProvider === "password"
-    && (tokenResult.claims.role === "student" || tokenResult.claims.role === "admin");
+    && (tokenResult.claims.role === "student" || tokenResult.claims.role === "admin" || tokenResult.claims.admin === true || isDefaultAdmin);
 }
 
 export async function ensureFirebaseProfile(firebaseUser: FirebaseUser, forceRefresh = true): Promise<User> {
