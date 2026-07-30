@@ -1,14 +1,16 @@
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
-import { db } from "../../firebase/config";
+import { supabase } from "../../lib/supabaseClient";
 import type { ApiResponse } from "../config/app.config";
 import type { CurriculumItem } from "../types";
 
 export const CurriculumService = {
   async fetchAll(): Promise<ApiResponse<CurriculumItem[]>> {
     try {
-      const snap = await getDocs(collection(db, "curriculum"));
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as CurriculumItem[];
-      return { success: true, data, error: null };
+      const { data, error } = await supabase
+        .from("curriculum")
+        .select("*");
+
+      if (error) throw error;
+      return { success: true, data: data as CurriculumItem[], error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -16,7 +18,11 @@ export const CurriculumService = {
 
   async add(item: CurriculumItem): Promise<ApiResponse<CurriculumItem>> {
     try {
-      await setDoc(doc(db, "curriculum", item.id), item);
+      const { error } = await supabase
+        .from("curriculum")
+        .insert(item);
+
+      if (error) throw error;
       return { success: true, data: item, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
@@ -25,11 +31,21 @@ export const CurriculumService = {
 
   async update(id: string, data: Partial<CurriculumItem>): Promise<ApiResponse<CurriculumItem>> {
     try {
-      const ref = doc(db, "curriculum", id);
-      await updateDoc(ref, data as Record<string, unknown>);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return { success: false, data: null, error: "Curriculum item not found." };
-      return { success: true, data: { id: snap.id, ...snap.data() } as CurriculumItem, error: null };
+      const { error } = await supabase
+        .from("curriculum")
+        .update(data)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      const { data: updatedItem, error: fetchError } = await supabase
+        .from("curriculum")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !updatedItem) return { success: false, data: null, error: "Curriculum item not found." };
+      return { success: true, data: updatedItem as CurriculumItem, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -37,7 +53,12 @@ export const CurriculumService = {
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
-      await deleteDoc(doc(db, "curriculum", id));
+      const { error } = await supabase
+        .from("curriculum")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };

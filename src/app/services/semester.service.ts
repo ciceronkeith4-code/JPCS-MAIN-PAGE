@@ -1,30 +1,39 @@
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
-import { db } from "../../firebase/config";
-import { auth } from "../../firebase/config";
+import { supabase } from "../../lib/supabaseClient";
 import type { ApiResponse } from "../config/app.config";
 import type { Semester } from "../types";
 
 export const SemesterService = {
   async fetchAll(userId?: string): Promise<ApiResponse<Semester[]>> {
     try {
-      const currentUser = auth.currentUser;
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) {
         return { success: false, data: null, error: "No authenticated user found." };
       }
-      const token = await currentUser.getIdTokenResult();
-      const scopedUserId = token.claims.admin === true
-        ? userId
-        : currentUser.uid;
 
-      let snap;
-      if (scopedUserId) {
-        const q = query(collection(db, "semesters"), where("user_id", "==", scopedUserId));
-        snap = await getDocs(q);
-      } else {
-        snap = await getDocs(collection(db, "semesters"));
+      // Check current user's role from profiles table
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (profileErr || !profile) {
+        return { success: false, data: null, error: "Unable to verify user role." };
       }
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Semester[];
-      return { success: true, data, error: null };
+
+      const scopedUserId = profile.role === "admin"
+        ? userId
+        : currentUser.id;
+
+      let query = supabase.from("semesters").select("*");
+      if (scopedUserId) {
+        query = query.eq("user_id", scopedUserId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return { success: true, data: data as Semester[], error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
     }
@@ -32,8 +41,11 @@ export const SemesterService = {
 
   async add(semester: Semester): Promise<ApiResponse<Semester>> {
     try {
-      // Merge keeps the existing record stable during repeated saves.
-      await setDoc(doc(db, "semesters", semester.id), semester, { merge: true });
+      const { error } = await supabase
+        .from("semesters")
+        .upsert(semester);
+
+      if (error) throw error;
       return { success: true, data: semester, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
@@ -42,7 +54,12 @@ export const SemesterService = {
 
   async update(id: string, data: Partial<Semester>): Promise<ApiResponse<void>> {
     try {
-      await updateDoc(doc(db, "semesters", id), data as Record<string, unknown>);
+      const { error } = await supabase
+        .from("semesters")
+        .update(data)
+        .eq("id", id);
+
+      if (error) throw error;
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };
@@ -51,7 +68,12 @@ export const SemesterService = {
 
   async delete(id: string): Promise<ApiResponse<void>> {
     try {
-      await deleteDoc(doc(db, "semesters", id));
+      const { error } = await supabase
+        .from("semesters")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
       return { success: true, data: null, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred." };

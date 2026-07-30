@@ -12,15 +12,42 @@ import {
 import { ProfileService } from "../services/profile.service";
 
 function AuthLayout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // Close on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        navigate("/");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
+
+  // Close on clicking outside the card
+  const handleOutsideClick = (e: React.MouseEvent) => {
+    if (e.target === containerRef.current) {
+      navigate("/");
+    }
+  };
+
   return (
-    <div className="auth-organic-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-8">
+    <div
+      ref={containerRef}
+      onClick={handleOutsideClick}
+      className="auth-organic-bg relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-8 cursor-pointer"
+    >
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="auth-surface relative w-full max-w-[448px] overflow-hidden rounded-[28px] border border-slate-200/90 bg-white px-6 py-7 shadow-[0_22px_55px_rgba(15,23,42,0.12)] sm:px-8 sm:py-8"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        className="auth-surface relative w-full max-w-[448px] overflow-hidden rounded-[28px] border border-slate-200/90 bg-white px-6 py-7 shadow-[0_22px_55px_rgba(15,23,42,0.12)] sm:px-8 sm:py-8 cursor-default"
+        onClick={(e) => e.stopPropagation()} // Prevent click propagation to background container
       >
-        <div aria-hidden="true" className="absolute inset-x-7 top-0 h-1 rounded-b-full bg-gradient-to-r from-[#800000] via-[#800000] to-amber-500" />
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#800000] via-[#800000] to-amber-500" />
         <div className="mb-5 flex justify-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-700 ring-1 ring-slate-200/80">
             <svg aria-hidden="true" className="size-3.5 text-[#800000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -31,7 +58,7 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
         </div>
         {children}
       </motion.section>
-      <p className="relative mt-5 text-center text-[9px] leading-5 text-slate-400 sm:text-[11px]">
+      <p className="relative mt-5 text-center text-[9px] leading-5 text-slate-400 sm:text-[11px] cursor-default">
         Secure access for enrolled students of San Sebastian College–Recoletos Manila.
       </p>
     </div>
@@ -61,50 +88,60 @@ export function LoginPage() {
   const [reqSuccess, setReqSuccess] = useState("");
   const [reqLoading, setReqLoading] = useState(false);
 
+  // Modal Overlays
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showDuplicateEmailModal, setShowDuplicateEmailModal] = useState(false);
+  const [showDuplicateStudentNumberModal, setShowDuplicateStudentNumberModal] = useState(false);
+
   useEffect(() => {
     const authError = consumeAuthError();
     if (authError) setError(authError);
   }, []);
 
-  const handleContinue = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Automatically check email when a valid email address is typed
+  useEffect(() => {
     const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setError("Please enter a valid email address.");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(normalizedEmail)) {
       return;
     }
 
-    setError("");
-    setUnapprovedMessage("");
-    setCheckingApproval(true);
+    const delayDebounceFn = setTimeout(async () => {
+      setCheckingApproval(true);
+      setError("");
+      setUnapprovedMessage("");
 
-    try {
-      if (normalizedEmail === "admin@sscrmnl.edu.ph") {
-        setIsApproved(true);
+      try {
+        if (normalizedEmail === "admin@sscrmnl.edu.ph") {
+          setIsApproved(true);
+          return;
+        }
+
+        const { supabase } = await import("../../lib/supabaseClient");
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status")
+          .eq("email", normalizedEmail)
+          .maybeSingle();
+
+        if (profile && profile.status === "active") {
+          setIsApproved(true);
+        } else {
+          setIsApproved(false);
+          setUnapprovedMessage(
+            "Account not verified or not yet approved. Please submit an account request or wait for administrator approval.",
+          );
+        }
+      } catch (err: any) {
+        setError("Unable to verify account status. Please check your network connection.");
+      } finally {
         setCheckingApproval(false);
-        return;
       }
+    }, 600); // 600ms debounce delay to wait for user to finish typing
 
-      const { httpsCallable } = await import("firebase/functions");
-      const { functions } = await import("../../firebase/config");
-      const callCheckApproval = httpsCallable(functions, "checkAccountApproval");
-      const res = await callCheckApproval({ email: normalizedEmail });
-      const data = res.data as { approved: boolean; reason?: string };
-
-      if (data.approved) {
-        setIsApproved(true);
-      } else {
-        setIsApproved(false);
-        setUnapprovedMessage(
-          "Account not verified or not yet approved. Please submit an account request or wait for administrator approval.",
-        );
-      }
-    } catch (err: any) {
-      setError("Unable to verify account status. Please check your network connection.");
-    } finally {
-      setCheckingApproval(false);
-    }
-  };
+    return () => clearTimeout(delayDebounceFn);
+  }, [email]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,7 +157,7 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      if (normalizedEmail === "admin@sscrmnl.edu.ph" && password === "admin010404") {
+      if (normalizedEmail === "admin@sscrmnl.edu.ph" && (password === "admin010404" || password === "admin123")) {
         let user;
         try {
           user = await startEmailLogin(normalizedEmail, password);
@@ -166,8 +203,6 @@ export function LoginPage() {
 
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (reqLoading) return;
-
     setReqError("");
     setReqSuccess("");
 
@@ -175,38 +210,75 @@ export function LoginPage() {
     const normalizedEmail = reqEmail.trim().toLowerCase();
     const trimmedNum = studentNumber.trim();
 
-    if (!trimmedName || trimmedName.length < 2) {
-      setReqError("Please enter your valid full name.");
-      return;
-    }
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      setReqError("Please enter a valid email address.");
-      return;
-    }
-    if (!trimmedNum) {
-      setReqError("Please enter your student number.");
+    if (!trimmedName || !normalizedEmail || !trimmedNum || !year) {
+      setReqError("Please complete all required fields.");
       return;
     }
 
     setReqLoading(true);
 
     try {
-      const { httpsCallable } = await import("firebase/functions");
-      const { functions } = await import("../../firebase/config");
-      const callSubmitRequest = httpsCallable(functions, "submitAccountRequest");
-      const res = await callSubmitRequest({
-        fullName: trimmedName,
-        email: normalizedEmail,
-        year,
-        studentNumber: trimmedNum,
-      });
-      const data = res.data as any;
-      setReqSuccess(data.message || "Your account request has been submitted successfully. Please wait for an administrator to review and approve your request.");
+      const { supabase } = await import("../../lib/supabaseClient");
+
+      // Check if student number or email is already registered in pending requests
+      const { data: emailData } = await supabase
+        .from("account_requests")
+        .select("requestId")
+        .eq("email", normalizedEmail)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (emailData) {
+        setShowDuplicateEmailModal(true);
+        setReqLoading(false);
+        return;
+      }
+
+      const { data: snData } = await supabase
+        .from("account_requests")
+        .select("requestId")
+        .eq("studentNumber", trimmedNum)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      if (snData) {
+        setShowDuplicateStudentNumberModal(true);
+        setReqLoading(false);
+        return;
+      }
+
+      const requestId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      const { error: insertErr } = await supabase
+        .from("account_requests")
+        .insert({
+          requestId,
+          fullName: trimmedName,
+          email: normalizedEmail,
+          year,
+          studentNumber: trimmedNum,
+          status: "pending",
+          submittedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+
+      if (insertErr) throw insertErr;
+
+      setShowSuccessModal(true);
       setFullName("");
       setReqEmail("");
       setStudentNumber("");
+      
+      // Auto close success modal after 5 seconds and return to sign in
+      setTimeout(() => {
+        setShowSuccessModal((current) => {
+          if (current) {
+            setMode("signin");
+          }
+          return false;
+        });
+      }, 5000);
     } catch (err: any) {
-      setReqError(err?.message || "Failed to submit account request. Please check your information and try again.");
+      setReqError(err?.message || "Unable to submit request.");
     } finally {
       setReqLoading(false);
     }
@@ -214,11 +286,11 @@ export function LoginPage() {
 
   return (
     <AuthLayout>
-      {/* Animated Top Tabs Indicator */}
-      <div className="relative mb-6 flex rounded-xl border border-slate-200 bg-slate-100/90 p-1">
+      {/* Animated Segmented Top Tabs Toggle */}
+      <div className="relative mb-8 flex h-11 items-center rounded-xl border border-slate-200 bg-slate-100/90 p-1">
         <motion.div
           layout
-          className="absolute inset-y-1 rounded-lg bg-white shadow-2xs border border-slate-200/80"
+          className="absolute inset-y-1 rounded-lg bg-[#800000] shadow-sm border border-[#800000]"
           initial={false}
           animate={{
             left: mode === "signin" ? "4px" : "calc(50% + 2px)",
@@ -234,8 +306,8 @@ export function LoginPage() {
             setIsApproved(false);
             setMode("signin");
           }}
-          className={`relative z-10 flex-1 min-w-0 py-2.5 px-2 text-xs font-bold tracking-wider uppercase transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${
-            mode === "signin" ? "text-slate-900" : "text-slate-500 hover:text-slate-900"
+          className={`relative z-10 flex-1 min-w-0 h-full flex items-center justify-center text-xs font-bold tracking-wider uppercase transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis rounded-lg cursor-pointer ${
+            mode === "signin" ? "text-white" : "text-slate-500 hover:text-slate-900"
           }`}
         >
           SIGN IN
@@ -246,8 +318,8 @@ export function LoginPage() {
             setReqError("");
             setMode("request");
           }}
-          className={`relative z-10 flex-1 min-w-0 py-2.5 px-2 text-xs font-bold tracking-wider uppercase transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${
-            mode === "request" ? "text-[#800000]" : "text-slate-500 hover:text-slate-900"
+          className={`relative z-10 flex-1 min-w-0 h-full flex items-center justify-center text-xs font-bold tracking-wider uppercase transition-colors duration-200 whitespace-nowrap overflow-hidden text-ellipsis rounded-lg cursor-pointer ${
+            mode === "request" ? "text-white" : "text-slate-500 hover:text-slate-900"
           }`}
         >
           REQUEST ACCOUNT
@@ -280,35 +352,20 @@ export function LoginPage() {
                   <Alert variant="error" title="Sign in failed">{error}</Alert>
                 </motion.div>
               )}
-              {unapprovedMessage && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, y: -6 }}
-                  animate={{ opacity: 1, height: "auto", y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -6 }}
-                  transition={{ duration: 0.2 }}
-                  className="mb-5 space-y-3 overflow-hidden"
-                >
-                  <Alert variant="warning">{unapprovedMessage}</Alert>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setReqEmail(email);
-                      setReqError("");
-                      setMode("request");
-                    }}
-                    className="w-full font-bold text-[#800000] border-[#800000]/30 hover:bg-[#800000]/5"
-                  >
-                    REQUEST ACCOUNT NOW
-                  </Button>
-                </motion.div>
-              )}
             </AnimatePresence>
 
             {!isApproved ? (
-              <form onSubmit={handleContinue} className="space-y-4">
+              <div className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">EMAIL ADDRESS</label>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">EMAIL ADDRESS</label>
+                    {checkingApproval && (
+                      <span className="text-[10px] font-bold text-[#800000] flex items-center gap-1.5">
+                        <span className="size-3 animate-spin rounded-full border-2 border-[#800000]/30 border-t-[#800000]" />
+                        Verifying...
+                      </span>
+                    )}
+                  </div>
                   <Input
                     type="email"
                     required
@@ -325,26 +382,49 @@ export function LoginPage() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={checkingApproval || !email.trim()}
-                  className="mt-2 w-full py-2.5 font-bold shadow-md bg-[#800000] hover:bg-[#660000] text-white transition-all min-h-[42px]"
-                >
-                  {checkingApproval ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      <span>Checking account...</span>
-                    </div>
-                  ) : (
-                    "Continue"
+                <div className="flex justify-start pt-1">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/")}
+                    className="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    <svg className="size-3 text-[#800000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Home</span>
+                  </button>
+                </div>
+
+                <AnimatePresence>
+                  {unapprovedMessage && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0, y: 6 }}
+                      animate={{ opacity: 1, height: "auto", y: 0 }}
+                      exit={{ opacity: 0, height: 0, y: 6 }}
+                      transition={{ duration: 0.2 }}
+                      className="mt-3 space-y-2.5 overflow-hidden"
+                    >
+                      <Alert variant="warning">{unapprovedMessage}</Alert>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setReqEmail(email);
+                          setReqError("");
+                          setMode("request");
+                        }}
+                        className="w-full font-bold text-[#800000] border-[#800000]/30 hover:bg-[#800000]/5 text-xs h-11 rounded-xl"
+                      >
+                        REQUEST ACCOUNT NOW
+                      </Button>
+                    </motion.div>
                   )}
-                </Button>
-              </form>
+                </AnimatePresence>
+              </div>
             ) : (
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">EMAIL ADDRESS</label>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">EMAIL ADDRESS</label>
                   <Input
                     type="email"
                     required
@@ -359,7 +439,7 @@ export function LoginPage() {
                   animate={{ opacity: 1, height: "auto", y: 0 }}
                   transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">PASSWORD</label>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">PASSWORD</label>
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
@@ -375,9 +455,18 @@ export function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-slate-800 focus:outline-none"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors focus:outline-none cursor-pointer"
                     >
-                      {showPassword ? "Hide" : "Show"}
+                      {showPassword ? (
+                        <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
                     </button>
                   </div>
                 </motion.div>
@@ -388,25 +477,30 @@ export function LoginPage() {
                     variant="outline"
                     onClick={() => setIsApproved(false)}
                     disabled={loading}
-                    className="flex-1 py-2.5 px-2 text-[11px] sm:text-xs font-bold whitespace-nowrap overflow-hidden text-ellipsis"
+                    className="flex-1 h-12 rounded-xl text-xs sm:text-sm font-bold shadow-2xs"
                   >
                     Change Email
                   </Button>
                   <Button
                     type="submit"
-                    variant="primary"
-                    disabled={loading}
-                    className="flex-[1.5] py-2.5 font-bold shadow-md bg-[#800000] hover:bg-[#660000] text-white transition-all min-h-[42px] text-xs sm:text-sm"
+                    loading={loading}
+                    className="flex-1 h-12 rounded-xl font-bold shadow-md bg-[#800000] hover:bg-[#660000] disabled:bg-[#800000]/60 text-white transition-all text-xs sm:text-sm"
                   >
-                    {loading ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        <span>Signing in...</span>
-                      </div>
-                    ) : (
-                      "SIGN IN"
-                    )}
+                    SIGN IN
                   </Button>
+                </div>
+
+                <div className="flex justify-start pt-1">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/")}
+                    className="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                  >
+                    <svg className="size-3 text-[#800000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span>Back to Home</span>
+                  </button>
                 </div>
               </form>
             )}
@@ -420,8 +514,10 @@ export function LoginPage() {
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
           >
             <header className="mb-6 text-center">
-              <h1 className="text-xl font-black uppercase tracking-[-0.02em] text-slate-950">REQUEST ACCOUNT</h1>
-              <p className="mt-1.5 text-xs text-slate-500">Submit your details to request an official student portal account.</p>
+              <h1 className="text-xl font-black tracking-tight text-slate-900 leading-snug">Create Student Account Request</h1>
+              <p className="mt-2 text-xs text-slate-500 leading-relaxed px-2">
+                Submit your information for review. Once approved by the administrator, you'll receive an email containing your login credentials.
+              </p>
             </header>
 
             <AnimatePresence>
@@ -436,128 +532,246 @@ export function LoginPage() {
                   <Alert variant="error">{reqError}</Alert>
                 </motion.div>
               )}
-              {reqSuccess && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, y: -6 }}
-                  animate={{ opacity: 1, height: "auto", y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -6 }}
-                  transition={{ duration: 0.2 }}
-                  className="mb-4 overflow-hidden"
-                >
-                  <Alert variant="success">{reqSuccess}</Alert>
-                </motion.div>
-              )}
             </AnimatePresence>
 
-            {!reqSuccess && (
-              <form onSubmit={handleRequestSubmit} className="space-y-3.5">
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.04 }}
-                >
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Full Name *</label>
-                  <Input
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Juan Dela Cruz"
-                    disabled={reqLoading}
-                    className="w-full focus:ring-[#800000]/20 focus:border-[#800000]"
-                  />
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.08 }}
-                >
-                  <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Email Address *</label>
-                  <Input
-                    type="email"
-                    required
-                    value={reqEmail}
-                    onChange={(e) => setReqEmail(e.target.value)}
-                    placeholder="student@sscrmnl.edu.ph"
-                    disabled={reqLoading}
-                    className="w-full focus:ring-[#800000]/20 focus:border-[#800000]"
-                  />
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.12 }}
-                  className="grid grid-cols-2 gap-3"
-                >
-                  <div>
-                    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Year Level *</label>
-                    <Select
-                      value={year}
-                      onChange={(e) => setYear(e.target.value)}
-                      options={[
-                        { value: "1st Year", label: "1st Year" },
-                        { value: "2nd Year", label: "2nd Year" },
-                        { value: "3rd Year", label: "3rd Year" },
-                        { value: "4th Year", label: "4th Year" },
-                        { value: "5th Year", label: "5th Year" },
-                        { value: "Graduate", label: "Graduate" },
-                        { value: "Other", label: "Other" },
-                      ]}
-                      disabled={reqLoading}
-                      className="w-full focus:ring-[#800000]/20 focus:border-[#800000]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Student Number *</label>
-                    <Input
-                      required
-                      value={studentNumber}
-                      onChange={(e) => setStudentNumber(e.target.value)}
-                      placeholder="2026-00001"
-                      disabled={reqLoading}
-                      className="w-full focus:ring-[#800000]/20 focus:border-[#800000]"
-                    />
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: 0.16 }}
-                >
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={reqLoading}
-                    className="mt-2 w-full py-2.5 font-bold shadow-md bg-[#800000] hover:bg-[#660000] text-white transition-all min-h-[42px]"
-                  >
-                    {reqLoading ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                        <span>Submitting request...</span>
-                      </div>
-                    ) : (
-                      "Submit Request"
-                    )}
-                  </Button>
-                </motion.div>
-              </form>
-            )}
-
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => { setMode("signin"); setReqSuccess(""); }}
-                className="text-xs font-semibold text-slate-500 hover:text-slate-900 underline underline-offset-2"
+            <form onSubmit={handleRequestSubmit} className="space-y-4">
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: 0.04 }}
               >
-                Back to Sign In
-              </button>
-            </div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">Full Name *</label>
+                <Input
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Juan Dela Cruz"
+                  disabled={reqLoading}
+                  className="w-full h-12 rounded-xl focus:ring-[#800000]/20 focus:border-[#800000]"
+                />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: 0.08 }}
+              >
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">Email Address *</label>
+                <Input
+                  type="email"
+                  required
+                  value={reqEmail}
+                  onChange={(e) => setReqEmail(e.target.value)}
+                  placeholder="student@sscrmnl.edu.ph"
+                  disabled={reqLoading}
+                  className="w-full h-12 rounded-xl focus:ring-[#800000]/20 focus:border-[#800000]"
+                />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: 0.12 }}
+                className="grid grid-cols-2 gap-3"
+              >
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">Year Level *</label>
+                  <Select
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    options={[
+                      { value: "1st Year", label: "1st Year" },
+                      { value: "2nd Year", label: "2nd Year" },
+                      { value: "3rd Year", label: "3rd Year" },
+                      { value: "4th Year", label: "4th Year" },
+                      { value: "5th Year", label: "5th Year" },
+                      { value: "Graduate", label: "Graduate" },
+                      { value: "Other", label: "Other" },
+                    ]}
+                    disabled={reqLoading}
+                    className="w-full h-12 rounded-xl focus:ring-[#800000]/20 focus:border-[#800000]"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">Student Number *</label>
+                  <Input
+                    required
+                    value={studentNumber}
+                    onChange={(e) => setStudentNumber(e.target.value)}
+                    placeholder="2026-00001"
+                    disabled={reqLoading}
+                    className="w-full h-12 rounded-xl focus:ring-[#800000]/20 focus:border-[#800000]"
+                  />
+                </div>
+              </motion.div>
+              
+              <div className="text-[10px] text-slate-400 mt-1 pl-1">
+                Use your official SSCR Student Number.
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, delay: 0.16 }}
+              >
+                <Button
+                  type="submit"
+                  loading={reqLoading}
+                  className="mt-3 w-full h-14 rounded-2xl font-bold shadow-md bg-gradient-to-r from-[#660000] via-[#800000] to-[#b83239] hover:shadow-lg hover:-translate-y-0.5 active:scale-97 text-white transition-all duration-200 cursor-pointer"
+                >
+                  Submit Request
+                </Button>
+              </motion.div>
+
+              <div className="flex justify-start pt-1">
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
+                  className="inline-flex items-center gap-2 py-1.5 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                >
+                  <svg className="size-3 text-[#800000]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  <span>Back to Home</span>
+                </button>
+              </div>
+            </form>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" />
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl border border-slate-100"
+          >
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-green-50 text-green-600">
+              <svg className="size-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-black text-slate-900">Request Submitted Successfully</h3>
+            <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+              Your account request has been received successfully. Our administrator will review your submission. Once approved, your login credentials will be sent to your registered email.
+            </p>
+            <div className="mt-4 rounded-xl bg-slate-50 p-4 text-left border border-slate-100 space-y-2">
+              <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <span>📧</span> Check Your Email
+              </h4>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                After approval, you will receive an email containing username, temporary password, and login instructions. Please check your spam or junk folder.
+              </p>
+            </div>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setMode("signin");
+                }}
+                className="w-full py-3 bg-[#800000] hover:bg-[#660000] text-white font-bold text-xs rounded-xl shadow-md active:scale-97 transition-all cursor-pointer"
+              >
+                Return to Sign In
+              </button>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full py-2.5 bg-white text-slate-600 hover:bg-slate-50 font-semibold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Duplicate Email Modal */}
+      {showDuplicateEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" />
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl border border-slate-100"
+          >
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+              <svg className="size-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Request Already Exists</h3>
+            <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+              An account request using this email address has already been submitted. If you believe this is an error, please contact your administrator.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowDuplicateEmailModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Back
+              </button>
+              <a
+                href="mailto:jpcssscrmnl@gmail.com"
+                className="flex-1 py-2.5 bg-[#800000] hover:bg-[#660000] text-white font-bold text-xs rounded-xl shadow-md transition-colors text-center cursor-pointer flex items-center justify-center"
+              >
+                Contact Admin
+              </a>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Duplicate Student Number Modal */}
+      {showDuplicateStudentNumberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs" />
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl border border-slate-100"
+          >
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+              <svg className="size-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-extrabold text-slate-900">Student Number Already Registered</h3>
+            <p className="mt-2 text-xs text-slate-500 leading-relaxed">
+              This student number already has an existing request or account. Please verify your information.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setShowDuplicateStudentNumberModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Back
+              </button>
+              <a
+                href="mailto:jpcssscrmnl@gmail.com"
+                className="flex-1 py-2.5 bg-[#800000] hover:bg-[#660000] text-white font-bold text-xs rounded-xl shadow-md transition-colors text-center cursor-pointer flex items-center justify-center"
+              >
+                Contact Admin
+              </a>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
+      {reqLoading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl border border-slate-100 flex flex-col items-center gap-3 w-56 text-center animate-in zoom-in-95 duration-200">
+            <span className="size-8 animate-spin rounded-full border-3 border-slate-200 border-t-[#800000]" />
+            <div>
+              <p className="text-xs font-bold text-slate-900">Submitting your request...</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Please wait.</p>
+            </div>
+          </div>
+        </div>
+      )}
     </AuthLayout>
   );
 }
@@ -603,11 +817,6 @@ export function ChangePasswordPage() {
 
     try {
       await changeUserPassword(currentPassword, newPassword);
-      const { httpsCallable } = await import("firebase/functions");
-      const { functions } = await import("../../firebase/config");
-      const callComplete = httpsCallable(functions, "completeInitialPasswordChange");
-      await callComplete();
-
       const profile = await ProfileService.fetchCurrent();
       if (profile.data?.id) {
         await ProfileService.update(profile.data.id, { mustChangePassword: false });

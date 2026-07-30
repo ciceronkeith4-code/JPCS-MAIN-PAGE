@@ -1,16 +1,14 @@
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { onIdTokenChanged } from "firebase/auth";
-import { auth } from "../firebase/config";
-import { authorizeFirebaseUser, signOutEverywhere } from "./auth/auth";
-import { clearSession, initStore, syncFromFirebase } from "./store";
+import { supabase } from "../lib/supabaseClient";
+import { authorizeSupabaseUser, signOutEverywhere } from "./auth/auth";
+import { clearSession, initStore, syncFromSupabase } from "./store";
 import { ProfileService } from "./services/profile.service";
 import type { User } from "./types";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const AppLayout = lazy(() => import("./pages/layout").then((module) => ({ default: module.AppLayout })));
-const LoginPage = lazy(() => import("./pages/auth").then((module) => ({ default: module.LoginPage })));
-const ChangePasswordPage = lazy(() => import("./pages/auth").then((module) => ({ default: module.ChangePasswordPage })));
+import { LoginPage, ChangePasswordPage } from "./pages/auth";
 const PublicSiteLayout = lazy(() => import("./public-site/components").then((module) => ({ default: module.PublicSiteLayout })));
 const HomePage = lazy(() => import("./public-site/pages").then((module) => ({ default: module.HomePage })));
 const ProgramsSitePage = lazy(() => import("./public-site/pages").then((module) => ({ default: module.ProgramsPage })));
@@ -64,26 +62,45 @@ function RequireGuest({ user, children }: { user: User | null; children: React.R
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const firebaseConfigured = Boolean(
-    import.meta.env.VITE_FIREBASE_API_KEY
-    && import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
-    && import.meta.env.VITE_FIREBASE_PROJECT_ID
-    && import.meta.env.VITE_FIREBASE_APP_ID
-    && import.meta.env.VITE_FIREBASE_API_KEY !== "placeholder-api-key",
+  const supabaseConfigured = Boolean(
+    import.meta.env.VITE_SUPABASE_URL
+    && import.meta.env.VITE_SUPABASE_ANON_KEY
+    && import.meta.env.VITE_SUPABASE_URL !== "https://your-supabase-project.supabase.co",
   );
   const isPublicRoute = ["/", "/programs", "/community", "/about", "/testimonials", "/login"].includes(window.location.pathname);
 
   useEffect(() => {
-    if (!firebaseConfigured) {
+    if (!supabaseConfigured) {
       clearSession();
       setAuthLoading(false);
       return;
     }
 
     let active = true;
-    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
-      setAuthLoading(true);
-      let authorizedUser = await authorizeFirebaseUser(firebaseUser);
+    let isFirstLoad = true;
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (active && session?.user) {
+        authorizeSupabaseUser(session.user).then((authorizedUser) => {
+          if (active) {
+            setUser(authorizedUser);
+            if (authorizedUser) syncFromSupabase().catch(() => undefined);
+            setAuthLoading(false);
+            isFirstLoad = false;
+          }
+        });
+      } else {
+        setAuthLoading(false);
+        isFirstLoad = false;
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (isFirstLoad) {
+        setAuthLoading(true);
+      }
+      let authorizedUser = await authorizeSupabaseUser(session?.user || null);
       if (!authorizedUser) {
         const { getSession } = await import("./store");
         const cached = getSession();
@@ -93,15 +110,16 @@ export default function App() {
       }
       if (!active) return;
       setUser(authorizedUser);
-      if (authorizedUser) await syncFromFirebase().catch(() => undefined);
+      if (authorizedUser) await syncFromSupabase().catch(() => undefined);
+      isFirstLoad = false;
       setAuthLoading(false);
     });
 
     return () => {
       active = false;
-      unsubscribe();
+      subscription.unsubscribe();
     };
-  }, [firebaseConfigured]);
+  }, [supabaseConfigured]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -128,7 +146,7 @@ export default function App() {
     setUser(null);
   };
 
-  if (!firebaseConfigured && !isPublicRoute) return <EnvErrorScreen />;
+  if (!supabaseConfigured && !isPublicRoute) return <EnvErrorScreen />;
   if (authLoading && !isPublicRoute) return <PageSkeleton />;
 
   return <ErrorBoundary><BrowserRouter><Suspense fallback={<PageSkeleton />}><Routes>
@@ -138,8 +156,8 @@ export default function App() {
       <Route path="/community" element={<CommunitySitePage />} />
       <Route path="/about" element={<AboutSitePage />} />
       <Route path="/testimonials" element={<TestimonialsSitePage />} />
-      <Route path="/login" element={<RequireGuest user={user}><LoginPage /></RequireGuest>} />
     </Route>
+    <Route path="/login" element={<RequireGuest user={user}><LoginPage /></RequireGuest>} />
     <Route path="/change-password" element={user ? <ChangePasswordPage /> : <Navigate to="/login" replace />} />
     <Route element={<RequireAuth user={user}><AppLayout user={user!} onLogout={handleLogout} /></RequireAuth>}>
       <Route path="/dashboard" element={<DashboardPage user={user!} />} />

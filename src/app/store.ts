@@ -1,18 +1,6 @@
 import type { User, Semester, Subject, CurriculumItem, AwardSetting, Announcement, AwardResult } from "./types";
-import { db, auth } from "../firebase/config";
-import {
-  collection,
-  getDocs,
-  doc,
-  setDoc,
-  getDoc,
-  deleteDoc,
-  writeBatch,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
-import { signOut as firebaseSignOut, type User as FirebaseUser } from "firebase/auth";
+import { supabase } from "../lib/supabaseClient";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { APP_CONFIG } from "./config/app.config";
 import { ProfileService } from "./services/profile.service";
 import { SemesterService } from "./services/semester.service";
@@ -84,10 +72,10 @@ function saveCache<T>(key: string, value: T) {
   }
 }
 
-const isFirebaseConfigured = () => {
-  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
-  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
-  return !!(apiKey && projectId && apiKey !== "placeholder-api-key");
+const isSupabaseConfigured = () => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://your-supabase-project.supabase.co");
 };
 
 // ── Request Deduplication ──────────────────────────────────────────────────
@@ -225,8 +213,8 @@ export function initStore() {
 
 // ── Background Sync ────────────────────────────────────────────────────────
 
-export async function syncFromFirebase() {
-  if (!isFirebaseConfigured()) return;
+export async function syncFromSupabase() {
+  if (!isSupabaseConfigured()) return;
   await deduplicate("sync", async () => {
     try {
       const [rUsers, rSems, rSubs, rCurr, rAnn] = await Promise.all([
@@ -237,9 +225,9 @@ export async function syncFromFirebase() {
         AnnouncementService.fetchAll(),
       ]);
 
-      // Fetch award_settings directly from Firestore
-      const awardSnap = await getDocs(collection(db, "award_settings"));
-      const awardData = awardSnap.docs.map((d) => ({ id: d.id, ...d.data() })) as AwardSetting[];
+      // Fetch award_settings directly from Supabase
+      const { data: awardData, error: awardErr } = await supabase.from("award_settings").select("*");
+      const awards = awardData || [];
 
       let changed = false;
 
@@ -259,8 +247,8 @@ export async function syncFromFirebase() {
         saveCache(KEYS.curriculum, hydrateLegacyCurriculumSchedule(rCurr.data));
         changed = true;
       }
-      if (awardData.length) {
-        saveCache(KEYS.awardSettings, awardData);
+      if (awards.length) {
+        saveCache(KEYS.awardSettings, awards);
         changed = true;
       }
       if (rAnn.success && rAnn.data) {
@@ -295,7 +283,7 @@ export async function syncFromFirebase() {
         window.dispatchEvent(new Event("sscr_store_synced"));
       }
     } catch (err) {
-      console.error("Firebase sync query error:", err);
+      console.error("Supabase sync query error:", err);
     }
   });
 }
@@ -434,46 +422,82 @@ export function clearSession() {
   window.dispatchEvent(new Event("sscr_store_synced"));
 }
 
-export async function refreshSessionFromFirebase(firebaseUser?: FirebaseUser): Promise<User | null> {
-  if (!isFirebaseConfigured()) return getSession();
+export async function refreshSessionFromSupabase(supabaseUser?: SupabaseUser): Promise<User | null> {
+  if (!isSupabaseConfigured()) return getSession();
 
-  const currentUser = firebaseUser || auth.currentUser;
-  if (!currentUser?.uid || !currentUser.email) return null;
+  const currentUser = supabaseUser || (await supabase.auth.getUser()).data.user;
+  if (!currentUser?.id || !currentUser.email) return null;
 
-  const userRef = doc(db, "users", currentUser.uid);
-  const snapshot = await getDoc(userRef);
-  if (!snapshot.exists()) {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", currentUser.id)
+    .single();
+
+  if (error || !profile) {
     const now = new Date().toISOString();
-    const profile: User = {
-      id: currentUser.uid,
-      uid: currentUser.uid,
-      full_name: currentUser.displayName || currentUser.email.split("@")[0],
+    const isDefaultAdmin = currentUser.email.trim().toLowerCase() === "admin@sscrmnl.edu.ph";
+    
+    // SQL compatible insert payload
+    const newProfileDb = {
+      id: currentUser.id,
+      full_name: currentUser.user_metadata?.full_name || currentUser.email.split("@")[0],
       student_number: "",
       course: "BSIT",
       year_level: "1",
-      role: "student",
+      role: isDefaultAdmin ? "admin" : "student",
       email: currentUser.email.trim().toLowerCase(),
+      status: "active",
+      mustChangePassword: false,
+    };
+    
+    const { error: insertError } = await supabase
+      .from("profiles")
+      .insert(newProfileDb);
+
+    if (insertError) {
+      console.error("Error creating profile in Supabase:", insertError);
+      return null;
+    }
+
+    const sessionUser: User = {
+      ...newProfileDb,
+      uid: currentUser.id,
       verified: true,
       provider: "email",
       created_at: now,
       updated_at: now,
     };
-    await setDoc(userRef, profile, { merge: false });
-    saveCache(KEYS.session, profile);
-    await syncFromFirebase();
-    return profile;
+
+    saveCache(KEYS.session, sessionUser);
+    await syncFromSupabase();
+    return sessionUser;
   }
 
-  const profile = { id: snapshot.id, ...snapshot.data() } as User;
-  if (profile.verified === false || profile.email !== currentUser.email.trim().toLowerCase()) return null;
-  saveCache(KEYS.session, profile);
-  await syncFromFirebase();
-  return profile;
+  const mappedProfile = { 
+    id: profile.id, 
+    uid: profile.id,
+    full_name: profile.full_name,
+    student_number: profile.student_number || "",
+    course: profile.course || "BSIT",
+    year_level: profile.year_level || "1",
+    role: profile.role,
+    email: profile.email,
+    verified: true,
+    status: profile.status,
+    mustChangePassword: profile.mustChangePassword,
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
+  } as User;
+
+  saveCache(KEYS.session, mappedProfile);
+  await syncFromSupabase();
+  return mappedProfile;
 }
 
 export function logout() {
   clearSession();
-  void firebaseSignOut(auth);
+  void supabase.auth.signOut();
 }
 
 
@@ -511,15 +535,15 @@ export function updateProfile(id: string, data: Partial<User>) {
     saveCache(KEYS.session, { ...session, ...data });
   }
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     ProfileService.update(id, data).then((res) => {
       if (!res.success) {
         console.warn("Profile update warning in Firebase:", res.error);
       }
       // Always re-sync from DB to confirm changes persisted
-      syncFromFirebase().catch(console.error);
+      syncFromSupabase().catch(console.error);
     }).catch(() => {
-      syncFromFirebase().catch(console.error);
+      syncFromSupabase().catch(console.error);
     });
   } else {
     window.dispatchEvent(new Event("sscr_store_synced"));
@@ -539,7 +563,7 @@ export function addSemester(data: Omit<Semester, "id">): Semester {
   const sem: Semester = { ...data, id: uid() };
   saveCache(KEYS.semesters, [...all, sem]);
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     SemesterService.add(sem).then((res) => {
       if (!res.success) {
         console.warn("Semester add warning in Firebase:", res.error);
@@ -573,7 +597,7 @@ export async function createSemester(
   }
 
   const semester: Semester = { ...data, id: uid() };
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     const result = await SemesterService.add(semester);
     if (!result.success) {
       return { success: false, data: null, error: result.error || "Unable to create semester." };
@@ -610,7 +634,7 @@ export async function editSemester(
     };
   }
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     const result = await SemesterService.update(id, data);
     if (!result.success) {
       return { success: false, error: result.error || "Unable to update semester." };
@@ -625,7 +649,7 @@ export async function editSemester(
 }
 
 export async function removeSemester(id: string): Promise<{ success: boolean; error?: string }> {
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     const result = await SemesterService.delete(id);
     if (!result.success) {
       return { success: false, error: result.error || "Unable to delete semester." };
@@ -644,7 +668,7 @@ export function updateSemester(id: string, data: Partial<Semester>) {
   const all = loadCache<Semester[]>(KEYS.semesters, []);
   saveCache(KEYS.semesters, all.map((s) => (s.id === id ? { ...s, ...data } : s)));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     SemesterService.update(id, data).then((res) => {
       if (!res.success) {
         console.warn("Semester update warning in Firebase:", res.error);
@@ -665,7 +689,7 @@ export function deleteSemester(id: string) {
   saveCache(KEYS.semesters, allSems.filter((s) => s.id !== id));
   saveCache(KEYS.subjects, allSubs.filter((s) => s.semester_id !== id));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     SemesterService.delete(id).then((res) => {
       if (!res.success) {
         console.warn("Semester delete warning in Firebase:", res.error);
@@ -717,7 +741,7 @@ export function addSubject(data: Omit<Subject, "id">): Subject {
   const sub: Subject = { ...data, id: uid() };
   saveCache(KEYS.subjects, [...all, sub]);
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     SubjectService.add(sub).then((res) => {
       if (!res.success) {
         console.warn("Subject add warning in Firebase:", res.error);
@@ -737,7 +761,7 @@ export function updateSubject(id: string, data: Partial<Subject>) {
   const all = loadCache<Subject[]>(KEYS.subjects, []);
   saveCache(KEYS.subjects, all.map((s) => (s.id === id ? { ...s, ...data } : s)));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     SubjectService.update(id, data).then((res) => {
       if (!res.success) {
         console.warn("Subject update warning in Firebase:", res.error);
@@ -755,7 +779,7 @@ export function deleteSubject(id: string) {
   const all = loadCache<Subject[]>(KEYS.subjects, []);
   saveCache(KEYS.subjects, all.filter((s) => s.id !== id));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     SubjectService.delete(id).then((res) => {
       if (!res.success) {
         console.warn("Subject delete warning in Firebase:", res.error);
@@ -826,7 +850,7 @@ export function addCurriculumItem(data: Omit<CurriculumItem, "id">): CurriculumI
   const item: CurriculumItem = { ...data, id: uid() };
   saveCache(KEYS.curriculum, [...all, item]);
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     CurriculumService.add(item).catch(() => {
       saveCache(KEYS.curriculum, all);
       window.dispatchEvent(new Event("sscr_store_synced"));
@@ -843,7 +867,7 @@ export async function updateCurriculumItem(
   const all = loadCache<CurriculumItem[]>(KEYS.curriculum, []);
   saveCache(KEYS.curriculum, all.map((i) => (i.id === id ? { ...i, ...data } : i)));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     const result = await CurriculumService.update(id, data);
     if (!result.success || !result.data) {
       saveCache(KEYS.curriculum, all);
@@ -866,7 +890,7 @@ export function deleteCurriculumItem(id: string) {
   const all = loadCache<CurriculumItem[]>(KEYS.curriculum, []);
   saveCache(KEYS.curriculum, all.filter((i) => i.id !== id));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     CurriculumService.delete(id).catch(() => {
       saveCache(KEYS.curriculum, all);
       window.dispatchEvent(new Event("sscr_store_synced"));
@@ -884,16 +908,21 @@ export function saveAwardSettings(settings: AwardSetting[]) {
   const previous = getAwardSettings();
   saveCache(KEYS.awardSettings, settings);
 
-  if (isFirebaseConfigured()) {
-    // Use writeBatch for atomic multi-document updates.
-    const batch = writeBatch(db);
-    settings.forEach((setting) => {
-      batch.set(doc(db, "award_settings", setting.id), setting, { merge: true });
-    });
-    void batch.commit().catch(() => {
-      saveCache(KEYS.awardSettings, previous);
-      window.dispatchEvent(new Event("sscr_store_synced"));
-    });
+  if (isSupabaseConfigured()) {
+    supabase
+      .from("award_settings")
+      .upsert(settings)
+      .then(({ error }) => {
+        if (error) {
+          console.warn("Award settings save error in Supabase:", error);
+          saveCache(KEYS.awardSettings, previous);
+          window.dispatchEvent(new Event("sscr_store_synced"));
+        }
+      })
+      .catch(() => {
+        saveCache(KEYS.awardSettings, previous);
+        window.dispatchEvent(new Event("sscr_store_synced"));
+      });
   }
 }
 
@@ -910,7 +939,7 @@ export function addAnnouncement(data: Omit<Announcement, "id">): Announcement {
   const item: Announcement = { ...data, id: uid() };
   saveCache(KEYS.announcements, [...all, item]);
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     AnnouncementService.add(item).catch(() => {
       saveCache(KEYS.announcements, all);
       window.dispatchEvent(new Event("sscr_store_synced"));
@@ -924,7 +953,7 @@ export function updateAnnouncement(id: string, data: Partial<Announcement>) {
   const all = loadCache<Announcement[]>(KEYS.announcements, []);
   saveCache(KEYS.announcements, all.map((i) => (i.id === id ? { ...i, ...data } : i)));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     AnnouncementService.update(id, data).catch(() => {
       saveCache(KEYS.announcements, all);
       window.dispatchEvent(new Event("sscr_store_synced"));
@@ -936,7 +965,7 @@ export function deleteAnnouncement(id: string) {
   const all = loadCache<Announcement[]>(KEYS.announcements, []);
   saveCache(KEYS.announcements, all.filter((i) => i.id !== id));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     AnnouncementService.delete(id).catch(() => {
       saveCache(KEYS.announcements, all);
       window.dispatchEvent(new Event("sscr_store_synced"));
@@ -972,7 +1001,7 @@ export function deleteUser(id: string) {
 
   saveCache(KEYS.users, users.filter((u) => u.id !== id));
 
-  if (isFirebaseConfigured()) {
+  if (isSupabaseConfigured()) {
     ProfileService.delete(id).then((res) => {
       if (!res.success) {
         console.warn("Profile delete warning in Firebase:", res.error);
@@ -980,10 +1009,10 @@ export function deleteUser(id: string) {
         saveCache(KEYS.users, users);
       }
       // Always re-sync from DB to confirm the delete
-      syncFromFirebase().catch(console.error);
+      syncFromSupabase().catch(console.error);
     }).catch(() => {
       saveCache(KEYS.users, users);
-      syncFromFirebase().catch(console.error);
+      syncFromSupabase().catch(console.error);
     });
   } else {
     window.dispatchEvent(new Event("sscr_store_synced"));

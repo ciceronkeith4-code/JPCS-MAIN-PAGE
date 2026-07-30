@@ -180,7 +180,15 @@ export function AdminDashboardPage() {
 
 export function StudentManagementPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [search]);
   const [viewUser, setViewUser] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [officerFilter, setOfficerFilter] = useState<"all" | "officers_only">("all");
@@ -360,11 +368,13 @@ export function StudentManagementPage() {
     }
   };
 
-  const filtered = users.filter((u) => {
-    const matchesSearch = !search || [u.full_name, u.student_number, u.course, u.email, u.officer_position || "", u.role || ""].some((v) => v.toLowerCase().includes(search.toLowerCase()));
-    const matchesOfficer = officerFilter === "all" || (u.officer_position && u.officer_position !== "None");
-    return matchesSearch && matchesOfficer;
-  });
+  const filtered = useMemo(() => {
+    return users.filter((u) => {
+      const matchesSearch = !debouncedSearch || [u.full_name, u.student_number, u.course, u.email, u.officer_position || "", u.role || ""].some((v) => v.toLowerCase().includes(debouncedSearch.toLowerCase()));
+      const matchesOfficer = officerFilter === "all" || (u.officer_position && u.officer_position !== "None");
+      return matchesSearch && matchesOfficer;
+    });
+  }, [users, debouncedSearch, officerFilter]);
 
   const handleDelete = () => {
     if (!deleting) return;
@@ -373,11 +383,11 @@ export function StudentManagementPage() {
     setDeleting(null);
   };
 
-  const viewedUser = viewUser ? users.find((u) => u.id === viewUser) : null;
-  const viewedSems = viewedUser ? getSemesters(viewedUser.id) : [];
-  const viewedSubs = viewedSems.flatMap((s) => getSubjects(s.id));
-  const viewedGA = calculateGA(viewedSubs);
-  const viewedAward = checkAward(viewedGA, viewedSubs, awardSettings);
+  const viewedUser = useMemo(() => viewUser ? users.find((u) => u.id === viewUser) : null, [viewUser, users]);
+  const viewedSems = useMemo(() => viewedUser ? getSemesters(viewedUser.id) : [], [viewedUser]);
+  const viewedSubs = useMemo(() => viewedSems.flatMap((s) => getSubjects(s.id)), [viewedSems]);
+  const viewedGA = useMemo(() => calculateGA(viewedSubs), [viewedSubs]);
+  const viewedAward = useMemo(() => checkAward(viewedGA, viewedSubs, awardSettings), [viewedGA, viewedSubs, awardSettings]);
 
   const officerOptions = [
     { value: "None", label: "Standard Student (No Officer Role)" },
@@ -421,16 +431,55 @@ export function StudentManagementPage() {
     }
     setCreateLoading(true);
     try {
-      const { httpsCallable } = await import("firebase/functions");
-      const { functions } = await import("../../firebase/config");
-      const callCreateStudent = httpsCallable(functions, "createStudentAccount");
-      await callCreateStudent(createForm);
+      const { createClient } = await import("@supabase/supabase-js");
+      const secondarySupabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
+        }
+      );
+      
+      const { data: signUpData, error: signUpError } = await secondarySupabase.auth.signUp({
+        email: createForm.email.trim().toLowerCase(),
+        password: createForm.password,
+        options: {
+          data: {
+            full_name: createForm.fullName.trim(),
+          }
+        }
+      });
+      
+      if (signUpError) throw signUpError;
+      const createdUserUid = signUpData.user?.id;
+      if (!createdUserUid) throw new Error("Could not create user account.");
+
+      const { supabase } = await import("../../lib/supabaseClient");
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: createForm.fullName.trim(),
+          student_number: createForm.studentId.trim(),
+          course: createForm.course || "BSIT",
+          year_level: createForm.yearLevel,
+          role: "student",
+          status: "active",
+          mustChangePassword: true,
+        })
+        .eq("id", createdUserUid);
+
+      if (profileErr) throw profileErr;
+
       setCreatedCredentials({ email: createForm.email.trim().toLowerCase(), pass: createForm.password });
       setToast(`Student account created successfully for ${createForm.fullName}!`);
       setCreateForm({ email: "", password: "", fullName: "", studentId: "", course: "BSIT", yearLevel: "1", section: "" });
       const freshProfiles = await ProfileService.fetchAll();
       if (freshProfiles.data) setUsers(freshProfiles.data);
     } catch (err: any) {
+      console.error("Direct client-side student creation failed:", err);
       setCreateError(err?.message || "Failed to create student account.");
     } finally {
       setCreateLoading(false);
@@ -1395,7 +1444,15 @@ export function AccountRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   // Accept Dialog State
   const [acceptingReq, setAcceptingReq] = useState<import("../types").AccountRequest | null>(null);
@@ -1414,23 +1471,15 @@ export function AccountRequestsPage() {
   const fetchRequests = useCallback(async () => {
     setLoading(true);
     try {
-      const { collection, getDocs, query, orderBy } = await import("firebase/firestore");
-      const { db } = await import("../../firebase/config");
-      const q = query(collection(db, "accountRequests"), orderBy("submittedAt", "desc"));
-      const snap = await getDocs(q);
-      const items = snap.docs.map((d) => ({ requestId: d.id, ...d.data() })) as import("../types").AccountRequest[];
-      setRequests(items);
-    } catch {
-      // Fallback without ordering
-      try {
-        const { collection, getDocs } = await import("firebase/firestore");
-        const { db } = await import("../../firebase/config");
-        const snap = await getDocs(collection(db, "accountRequests"));
-        const items = snap.docs.map((d) => ({ requestId: d.id, ...d.data() })) as import("../types").AccountRequest[];
-        setRequests(items);
-      } catch (err: any) {
-        setToast("Unable to load account requests.");
-      }
+      const { supabase } = await import("../../lib/supabaseClient");
+      const { data, error } = await supabase
+        .from("account_requests")
+        .select("*");
+
+      if (error) throw error;
+      setRequests(data as import("../types").AccountRequest[]);
+    } catch (err: any) {
+      setToast("Unable to load account requests.");
     } finally {
       setLoading(false);
     }
@@ -1445,14 +1494,70 @@ export function AccountRequestsPage() {
     setAcceptLoading(true);
     setAcceptError(null);
     try {
-      const { httpsCallable } = await import("firebase/functions");
-      const { functions } = await import("../../firebase/config");
-      const callApprove = httpsCallable(functions, "approveAccountRequest");
-      await callApprove({ requestId: acceptingReq.requestId });
+      const { createClient } = await import("@supabase/supabase-js");
+      const secondarySupabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
+        }
+      );
+      
+      const { data: signUpData, error: signUpError } = await secondarySupabase.auth.signUp({
+        email: acceptingReq.email.trim().toLowerCase(),
+        password: "gobaste123",
+        options: {
+          data: {
+            full_name: acceptingReq.fullName.trim(),
+          }
+        }
+      });
+      
+      if (signUpError) throw signUpError;
+      const createdUserUid = signUpData.user?.id;
+      if (!createdUserUid) throw new Error("Could not create user account.");
+
+      const { supabase } = await import("../../lib/supabaseClient");
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: acceptingReq.fullName,
+          student_number: acceptingReq.studentNumber,
+          course: "BSIT",
+          year_level: acceptingReq.year.replace(/[^0-9]/g, "") || "1",
+          role: "student",
+          status: "active",
+          mustChangePassword: true,
+        })
+        .eq("id", createdUserUid);
+
+      if (profileErr) throw profileErr;
+
+      const { data: { user: mainAuthUser } } = await supabase.auth.getUser();
+      const adminUid = mainAuthUser?.id || "fallback-admin-uid";
+
+      const { error: reqErr } = await supabase
+        .from("account_requests")
+        .update({
+          status: "approved",
+          reviewedAt: new Date().toISOString(),
+          reviewedBy: adminUid,
+          updatedAt: new Date().toISOString(),
+          createdUserUid: createdUserUid,
+          rejectionReason: null,
+        })
+        .eq("requestId", acceptingReq.requestId);
+
+      if (reqErr) throw reqErr;
+
       setToast(`Account request for ${acceptingReq.fullName} has been approved.`);
       setAcceptingReq(null);
       await fetchRequests();
     } catch (err: any) {
+      console.error("Approve account request failed:", err);
       setAcceptError(err?.message || "Failed to approve account request.");
     } finally {
       setAcceptLoading(false);
@@ -1470,26 +1575,43 @@ export function AccountRequestsPage() {
     setRejectLoading(true);
     setRejectError(null);
     try {
-      const { httpsCallable } = await import("firebase/functions");
-      const { functions } = await import("../../firebase/config");
-      const callReject = httpsCallable(functions, "rejectAccountRequest");
-      await callReject({ requestId: rejectingReq.requestId, rejectionReason: trimmed });
+      const { supabase } = await import("../../lib/supabaseClient");
+      const { data: { user: mainAuthUser } } = await supabase.auth.getUser();
+      const adminUid = mainAuthUser?.id || "fallback-admin-uid";
+
+      const { error: reqErr } = await supabase
+        .from("account_requests")
+        .update({
+          status: "rejected",
+          rejectionReason: trimmed,
+          reviewedAt: new Date().toISOString(),
+          reviewedBy: adminUid,
+          updatedAt: new Date().toISOString(),
+          createdUserUid: null,
+        })
+        .eq("requestId", rejectingReq.requestId);
+
+      if (reqErr) throw reqErr;
+
       setToast(`Account request for ${rejectingReq.fullName} has been rejected.`);
       setRejectingReq(null);
       setRejectionReason("");
       await fetchRequests();
     } catch (err: any) {
+      console.error("Reject account request failed:", err);
       setRejectError(err?.message || "Failed to reject account request.");
     } finally {
       setRejectLoading(false);
     }
   };
 
-  const filtered = requests.filter((r) => {
-    const matchesFilter = filter === "all" || r.status === filter;
-    const matchesSearch = !search || [r.fullName, r.email, r.studentNumber, r.year].some((val) => (val || "").toLowerCase().includes(search.toLowerCase()));
-    return matchesFilter && matchesSearch;
-  });
+  const filtered = useMemo(() => {
+    return requests.filter((r) => {
+      const matchesFilter = filter === "all" || r.status === filter;
+      const matchesSearch = !debouncedSearch || [r.fullName, r.email, r.studentNumber, r.year].some((val) => (val || "").toLowerCase().includes(debouncedSearch.toLowerCase()));
+      return matchesFilter && matchesSearch;
+    });
+  }, [requests, filter, debouncedSearch]);
 
   return (
     <div>

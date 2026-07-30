@@ -252,12 +252,11 @@ export function SubjectsPage({ user }: { user: User }) {
     setSelectedSemId(semId);
     refreshSubjects(semId);
   };
-
-  const [selectedCurriculumId, setSelectedCurriculumId] = useState("");
   const [importYear, setImportYear] = useState("1");
   const [importSem, setImportSem] = useState("First Semester");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+
+  const [selectedCurriculumId, setSelectedCurriculumId] = useState("");
 
   const curriculumItems = currentSem
     ? getCurriculum({ course: user.course })

@@ -98,6 +98,7 @@ export function ImagePlaceholder({ label, file, className = "", priority = false
         src={`/images/${file}`} 
         alt={label} 
         className="absolute inset-0 w-full h-full object-cover z-10" 
+        loading="lazy"
         onError={(e) => { e.currentTarget.style.display = 'none'; }} 
       />
       <div className="site-image-placeholder__inner" />
@@ -513,6 +514,7 @@ export function OfficerPhoto({
               src={profilePhoto}
               alt={`${name} formal portrait`}
               className="officer-img"
+              loading="lazy"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}
@@ -528,6 +530,7 @@ export function OfficerPhoto({
               src={actionPhoto}
               alt={`${name} casual portrait`}
               className="officer-img"
+              loading="lazy"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}

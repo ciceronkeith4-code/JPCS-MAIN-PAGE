@@ -1,15 +1,6 @@
-import {
-  EmailAuthProvider,
-  getIdTokenResult,
-  reauthenticateWithCredential,
-  reload,
-  signInWithEmailAndPassword,
-  signOut,
-  updatePassword,
-  type User as FirebaseUser,
-} from "firebase/auth";
-import { auth } from "../../firebase/config";
-import { clearSession, refreshSessionFromFirebase } from "../store";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { supabase } from "../../lib/supabaseClient";
+import { clearSession, refreshSessionFromSupabase } from "../store";
 import type { User } from "../types";
 
 const AUTH_ERROR_STORAGE_KEY = "jpcs_auth_error";
@@ -45,7 +36,7 @@ export function rememberAuthError(code: AuthErrorCode) {
   try {
     sessionStorage.setItem(AUTH_ERROR_STORAGE_KEY, code);
   } catch {
-    // Hardened browsers may disable session storage; the next login still works.
+    // Hardened browsers may disable session storage
   }
 }
 
@@ -59,63 +50,53 @@ export function consumeAuthError() {
   }
 }
 
-function isConfigured() {
+export function isConfigured() {
   return Boolean(
-    import.meta.env.VITE_FIREBASE_API_KEY
-    && import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
-    && import.meta.env.VITE_FIREBASE_PROJECT_ID
-    && import.meta.env.VITE_FIREBASE_APP_ID
-    && import.meta.env.VITE_FIREBASE_API_KEY !== "placeholder-api-key",
+    import.meta.env.VITE_SUPABASE_URL
+    && import.meta.env.VITE_SUPABASE_ANON_KEY
+    && import.meta.env.VITE_SUPABASE_URL !== "https://your-supabase-project.supabase.co",
   );
 }
 
-function mapFirebaseError(error: unknown): AuthError {
-  const code = error && typeof error === "object" && "code" in error
-    ? String((error as { code?: unknown }).code)
-    : "";
-  if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential" || code === "auth/invalid-email") {
+function mapSupabaseError(error: any): AuthError {
+  const message = error?.message || "";
+  if (message.toLowerCase().includes("invalid login credentials")) {
     return new AuthError("invalid_credentials");
   }
-  if (code === "auth/user-disabled") return new AuthError("disabled_account");
-  if (code === "auth/too-many-requests") return new AuthError("too_many_requests");
-  if (code === "auth/network-request-failed") return new AuthError("network");
-  if (code === "auth/invalid-api-key" || code === "auth/configuration-not-found") {
-    return new AuthError("configuration");
+  if (message.toLowerCase().includes("email not confirmed")) {
+    return new AuthError("invalid_credentials"); // Map to credentials or unconfirmed
   }
   return new AuthError("unknown");
 }
 
-export async function validateFirebaseUser(firebaseUser: FirebaseUser, forceRefresh = true) {
-  await reload(firebaseUser);
-  if (!firebaseUser.email || !firebaseUser.emailVerified) {
+export async function validateSupabaseUser(supabaseUser: SupabaseUser) {
+  if (!supabaseUser || !supabaseUser.email) {
     return false;
   }
+  // Retrieve profile details to check role and status
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("role, status")
+    .eq("id", supabaseUser.id)
+    .single();
 
-  const tokenResult = await getIdTokenResult(firebaseUser, forceRefresh);
-  const isDefaultAdmin = firebaseUser.email.trim().toLowerCase() === "admin@sscrmnl.edu.ph";
-  return tokenResult.signInProvider === "password"
-    && (tokenResult.claims.role === "student" || tokenResult.claims.role === "admin" || tokenResult.claims.admin === true || isDefaultAdmin);
+  if (error || !profile) {
+    return false;
+  }
+  if (profile.status === "disabled") {
+    return false;
+  }
+  return true;
 }
 
-export async function ensureFirebaseProfile(firebaseUser: FirebaseUser, forceRefresh = true): Promise<User> {
-  const valid = await validateFirebaseUser(firebaseUser, forceRefresh);
-  if (!valid) {
-    await signOut(auth).catch(() => undefined);
-    clearSession();
-    throw new AuthError("invalid_credentials");
-  }
-
-  const profile = await refreshSessionFromFirebase(firebaseUser);
+export async function ensureSupabaseProfile(supabaseUser: SupabaseUser): Promise<User> {
+  const profile = await refreshSessionFromSupabase(supabaseUser);
   if (!profile) {
-    await signOut(auth).catch(() => undefined);
+    await supabase.auth.signOut();
     clearSession();
     throw new AuthError("invalid_credentials");
   }
-  const tokenResult = await getIdTokenResult(firebaseUser);
-  return {
-    ...profile,
-    role: tokenResult.claims.admin === true ? "admin" : "student",
-  };
+  return profile;
 }
 
 export async function startEmailLogin(email: string, password: string) {
@@ -123,36 +104,50 @@ export async function startEmailLogin(email: string, password: string) {
 
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const result = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-    return await ensureFirebaseProfile(result.user);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+    if (error) throw mapSupabaseError(error);
+    if (!data.user) throw new AuthError("unknown");
+
+    return await ensureSupabaseProfile(data.user);
   } catch (error) {
     if (error instanceof AuthError) throw error;
-    throw mapFirebaseError(error);
+    throw mapSupabaseError(error);
   }
 }
 
-export async function reauthenticatePassword(email: string, password: string, firebaseUser: FirebaseUser) {
-  const credential = EmailAuthProvider.credential(email.trim().toLowerCase(), password);
-  return reauthenticateWithCredential(firebaseUser, credential);
+export async function reauthenticatePassword(email: string, password: string) {
+  // Supabase manages sessions automatically. To reauthenticate, we can call signInWithPassword again
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+  if (error) throw mapSupabaseError(error);
 }
 
 export async function changeUserPassword(currentPassword: string, newPassword: string) {
-  const user = auth.currentUser;
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user || !user.email) throw new AuthError("invalid_credentials");
-  await reauthenticatePassword(user.email, currentPassword, user);
-  await updatePassword(user, newPassword);
+  await reauthenticatePassword(user.email, currentPassword);
+  
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+  if (error) throw new Error(error.message);
 }
 
-export async function authorizeFirebaseUser(firebaseUser: FirebaseUser | null) {
-  if (!firebaseUser) {
+export async function authorizeSupabaseUser(supabaseUser: SupabaseUser | null) {
+  if (!supabaseUser) {
     clearSession();
     return null;
   }
   try {
-    return await ensureFirebaseProfile(firebaseUser, false);
+    return await ensureSupabaseProfile(supabaseUser);
   } catch (error) {
     rememberAuthError(error instanceof AuthError ? error.code : "unknown");
-    await signOut(auth).catch(() => undefined);
+    await supabase.auth.signOut();
     clearSession();
     return null;
   }
@@ -160,5 +155,5 @@ export async function authorizeFirebaseUser(firebaseUser: FirebaseUser | null) {
 
 export async function signOutEverywhere() {
   clearSession();
-  await signOut(auth);
+  await supabase.auth.signOut();
 }

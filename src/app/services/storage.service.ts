@@ -1,5 +1,4 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { storage } from "../../firebase/config";
+import { supabase } from "../../lib/supabaseClient";
 import type { ApiResponse } from "../config/app.config";
 import { APP_CONFIG } from "../config/app.config";
 
@@ -59,14 +58,28 @@ export const StorageService = {
   async uploadAvatar(file: File, userId: string, variant: "profile" | "action" = "profile"): Promise<ApiResponse<string>> {
     try {
       const compressedBlob = await this.compressImage(file);
-      const filename = `avatars/${userId}/${variant}.webp`;
-      if (import.meta.env.DEV) console.debug("Uploading profile image", { userId, path: filename });
+      const filename = `${userId}/${variant}.webp`;
+      if (import.meta.env.DEV) console.debug("Uploading profile image to Supabase Storage", { userId, path: filename });
 
-      const storageRef = ref(storage, filename);
-      await uploadBytes(storageRef, compressedBlob, { contentType: "image/webp" });
-      const downloadUrl = await getDownloadURL(storageRef);
+      // Convert Blob to File object for Supabase upload
+      const fileToUpload = new File([compressedBlob], `${variant}.webp`, { type: "image/webp" });
 
-      return { success: true, data: `${downloadUrl}?v=${Date.now()}`, error: null };
+      const { error } = await supabase.storage
+        .from("avatars")
+        .upload(filename, fileToUpload, {
+          contentType: "image/webp",
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filename);
+
+      if (!data?.publicUrl) throw new Error("Could not retrieve public URL for uploaded file.");
+
+      return { success: true, data: `${data.publicUrl}?v=${Date.now()}`, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "An unexpected error occurred during upload." };
     }
@@ -76,26 +89,22 @@ export const StorageService = {
     try {
       let filePath = pathOrUrl;
 
-      // Handle Firebase Storage download URLs
-      if (pathOrUrl.startsWith("https://firebasestorage.googleapis.com")) {
-        const pathMatch = pathOrUrl.match(/\/o\/(.+?)(?:\?|$)/);
-        if (pathMatch) {
-          filePath = decodeURIComponent(pathMatch[1]);
-        }
+      // Handle Supabase Storage public URLs
+      if (pathOrUrl.includes("/storage/v1/object/public/avatars/")) {
+        filePath = pathOrUrl.split("/storage/v1/object/public/avatars/")[1];
       }
 
       filePath = filePath.split(/[?#]/, 1)[0];
 
       if (filePath && !filePath.startsWith("data:") && !filePath.startsWith("http")) {
-        const storageRef = ref(storage, filePath);
-        await deleteObject(storageRef);
+        const { error } = await supabase.storage
+          .from("avatars")
+          .remove([filePath]);
+
+        if (error) throw error;
       }
       return { success: true, data: null, error: null };
     } catch (err: any) {
-      // Treat "file not found" as success — already deleted
-      if (err?.code === "storage/object-not-found") {
-        return { success: true, data: null, error: null };
-      }
       return { success: false, data: null, error: err?.message || "An unexpected error occurred during storage deletion." };
     }
   }
