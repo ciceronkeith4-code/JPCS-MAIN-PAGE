@@ -72,11 +72,7 @@ export function saveCache<T>(key: string, value: T) {
   }
 }
 
-const isSupabaseConfigured = () => {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  return !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== "https://your-supabase-project.supabase.co");
-};
+const isSupabaseConfigured = () => true;
 
 // ── Request Deduplication ──────────────────────────────────────────────────
 const activePromises: Record<string, Promise<any>> = {};

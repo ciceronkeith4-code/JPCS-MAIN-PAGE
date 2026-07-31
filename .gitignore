@@ -37,3 +37,4 @@ scripts/
 .vercel
 
 .vercel
+.env*
