@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Card, PageHeader, EmptyState, AwardDisplay, GradeBadge } from "../components/ui";
 import { getSemesters, getSubjects, getAwardSettings, calculateGA, checkAward } from "../store";
-import type { User } from "../types";
+import type { User } from "../../types";
 
 export function HistoryPage({ user }: { user: User }) {
   const semesters = getSemesters(user.id);

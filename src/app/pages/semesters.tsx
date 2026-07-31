@@ -10,7 +10,7 @@ import {
   getSubjects, calculateGA, checkAward, getAwardSettings, getCurriculum,
   addSubject, updateSubject, deleteSubject,
 } from "../store";
-import type { User, Semester } from "../types";
+import type { User, Semester } from "../../types";
 
 const today = new Date();
 const currentAcademicYearStart = today.getMonth() + 1 >= 6

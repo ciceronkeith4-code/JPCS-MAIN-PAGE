@@ -7,7 +7,7 @@ import {
   getSemesters, getSubjects, getAwardSettings, getAnnouncements, calculateGA, checkAward, getCurriculum, addSemester, addSubject,
   hasRecordedFinalGrade,
 } from "../store";
-import type { User } from "../types";
+import type { User } from "../../types";
 import { expandScheduleDays } from "../schedule";
 
 function DashboardCalendar({

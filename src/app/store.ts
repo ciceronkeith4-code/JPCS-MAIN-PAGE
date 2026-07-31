@@ -1,13 +1,13 @@
-import type { User, Semester, Subject, CurriculumItem, AwardSetting, Announcement, AwardResult } from "./types";
-import { supabase } from "../lib/supabaseClient";
+import type { User, Semester, Subject, CurriculumItem, AwardSetting, Announcement, AwardResult } from "../types";
+import { supabase } from "../services/supabase/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { APP_CONFIG } from "./config/app.config";
-import { ProfileService } from "./services/profile.service";
-import { SemesterService } from "./services/semester.service";
-import { SubjectService } from "./services/subject.service";
-import { CurriculumService } from "./services/curriculum.service";
-import { AnnouncementService } from "./services/announcement.service";
-import { StorageService } from "./services/storage.service";
+import { APP_CONFIG } from "../constants/app.constants";
+import { ProfileService } from "../services/profile.service";
+import { SemesterService } from "../services/semester.service";
+import { SubjectService } from "../services/subject.service";
+import { CurriculumService } from "../services/curriculum.service";
+import { AnnouncementService } from "../services/announcement.service";
+import { StorageService } from "../services/storage.service";
 import { applyCurriculumSchedule } from "./schedule";
 
 const KEYS = {

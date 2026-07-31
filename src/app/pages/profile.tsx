@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Card, Button, Input, Select, PageHeader, Alert } from "../components/ui";
-import { StorageService } from "../services/storage.service";
-import { ProfileService } from "../services/profile.service";
-import type { User } from "../types";
+import { StorageService } from "../../services/storage.service";
+import { ProfileService } from "../../services/profile.service";
+import type { User } from "../../types";
 
 const COURSES = [
   { value: "BSIT", label: "BS Information Technology" },

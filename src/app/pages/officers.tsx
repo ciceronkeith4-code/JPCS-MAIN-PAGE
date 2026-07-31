@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PageHeader, EmptyState } from "../components/ui";
 import { getAllUsers } from "../store";
-import type { User } from "../types";
+import type { User } from "../../types";
 import { OfficerPhoto } from "../public-site/components";
 
 function OfficerPhotoCard({ officer, index }: { officer: User; index: number }) {

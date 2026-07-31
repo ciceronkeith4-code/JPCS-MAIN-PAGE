@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { AnimatedTabPanel, Card, PageHeader, StatCard, EmptyState, Tabs } from "../components/ui";
 import { getSemesters, getSubjects, getAwardSettings, calculateGA, checkAward } from "../store";
-import type { User } from "../types";
+import type { User } from "../../types";
 
 const GRADE_BUCKETS = [
   { label: "95–100", min: 95, max: 100 },

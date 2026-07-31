@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, Button, PageHeader, Badge, Alert, AwardDisplay, Select } from "../components/ui";
 import { getSemesters, getSubjects, getAwardSettings, calculateGA, checkAward, updateSubject } from "../store";
-import type { User, Subject } from "../types";
+import type { User, Subject } from "../../types";
 
 export function SimulatorPage({ user }: { user: User }) {
   const [tick, setTick] = useState(0);

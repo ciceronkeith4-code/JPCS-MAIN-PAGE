@@ -39,21 +39,30 @@ export const ProfileService = {
             student_number: row.student_number || "",
             course: row.course || "BSIT",
             year_level: row.year_level || "1",
-            role: (row.role as any) || "student",
+            role: (row.role === "admin" ? "admin" : "student") as "student" | "admin",
             email: row.email || "",
             status: row.status || "active",
-          } as User);
+          });
         }
       }
 
       if (profilesData) {
         for (const row of profilesData) {
+          const existing = mergedMap.get(row.id);
           mergedMap.set(row.id, {
-            ...mergedMap.get(row.id),
-            ...row,
             id: row.id,
             uid: row.id,
-          } as User);
+            full_name: row.full_name || existing?.full_name || "",
+            student_number: row.student_number || existing?.student_number || "",
+            course: row.course || existing?.course || "BSIT",
+            year_level: row.year_level || existing?.year_level || "1",
+            role: (row.role === "admin" || existing?.role === "admin" ? "admin" : "student") as "student" | "admin",
+            email: row.email || existing?.email || "",
+            status: row.status || existing?.status || "active",
+            profile_photo: row.profile_photo || existing?.profile_photo,
+            action_photo: row.action_photo || existing?.action_photo,
+            officer_position: row.officer_position || existing?.officer_position,
+          });
         }
       }
 
