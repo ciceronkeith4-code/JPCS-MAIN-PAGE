@@ -191,12 +191,13 @@ export function LoginPage() {
       } else {
         navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
       }
-    } catch (authError) {
+    } catch (authError: any) {
+      console.error("Authentication error details:", authError);
       setLoading(false);
       setError(
         authError instanceof AuthError
           ? authError.message
-          : "Invalid email or password. Please check your credentials and try again.",
+          : authError?.message || "Invalid email or password. Please check your credentials and try again.",
       );
     }
   };

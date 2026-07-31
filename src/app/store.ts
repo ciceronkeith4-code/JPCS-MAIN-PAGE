@@ -58,7 +58,7 @@ function loadCache<T>(key: string, fallback: T): T {
   }
 }
 
-function saveCache<T>(key: string, value: T) {
+export function saveCache<T>(key: string, value: T) {
   try {
     const wrapper: CacheWrapper<T> = {
       version: CACHE_VERSION,
