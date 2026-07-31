@@ -188,15 +188,36 @@ export const ProfileService = {
   async updateForAdmin(targetUserId: string, changes: AdminProfileUpdate): Promise<ApiResponse<User>> {
     debug("Submitting admin profile update", { targetUserId, fields: Object.keys(changes) });
     try {
-      const { error } = await supabase
+      const cleanPayload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      for (const [k, v] of Object.entries(changes)) {
+        if (v !== undefined) {
+          cleanPayload[k] = v;
+        }
+      }
+
+      let { error } = await supabase
         .from(PROFILE_TABLE)
-        .update({ ...changes, updated_at: new Date().toISOString() })
+        .update(cleanPayload)
         .eq("id", targetUserId);
+
+      if (error && error.message?.includes("column")) {
+        // Fallback: Strip optional photo fields if missing in Postgres schema
+        const fallbackPayload = { ...cleanPayload };
+        delete fallbackPayload.action_photo;
+        delete fallbackPayload.profile_photo;
+        const retry = await supabase
+          .from(PROFILE_TABLE)
+          .update(fallbackPayload)
+          .eq("id", targetUserId);
+        error = retry.error;
+      }
 
       try {
         await supabase
           .from("users")
-          .update({ ...changes, updated_at: new Date().toISOString() })
+          .update(cleanPayload)
           .eq("id", targetUserId);
       } catch {
         // Silently continue if users table sync fails
