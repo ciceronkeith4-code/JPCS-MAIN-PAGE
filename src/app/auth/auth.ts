@@ -1,7 +1,7 @@
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabaseClient";
 import { clearSession, refreshSessionFromSupabase } from "../store";
-import type { User } from "../types";
+import type { User } from "../../types";
 
 const AUTH_ERROR_STORAGE_KEY = "jpcs_auth_error";
 
