@@ -64,7 +64,7 @@ export const values: Feature[] = [
 export const officers = [
   { name: "Keith Czimonne Anderson Ciceron", role: "President", course: "BSIT · 4th Year", responsibility: "Sets the department direction, leads student initiatives, and supports every team.", profile_photo: "/officers/ciceron_profile.png", action_photo: "/officers/ciceron_action.jpg" },
   { name: "Karl Tristan Benedicto", role: "Vice President", course: "BSIT · 4th Year", responsibility: "Coordinates academic programs and strengthens internal officer collaboration.", profile_photo: "/officers/benedicto_profile.png", action_photo: "/officers/benedicto_action.jpg" },
-  { name: "Andrei Baguisa", role: "Secretary", course: "BSIT · 4th Year", responsibility: "Keeps department communications, schedules, and official records dependable.", profile_photo: "/officers/baguisa_profile.jpg", action_photo: "/officers/baguisa_action.jpg" },
+  { name: "Andrei Baguisa", role: "Secretary", course: "BSIT · 3rd Year", responsibility: "Keeps department communications, schedules, and official records dependable.", profile_photo: "/officers/baguisa_profile.jpg", action_photo: "/officers/baguisa_action.jpg" },
   { name: "Kenneth Gregorio", role: "Treasurer", course: "BSIT · 4th Year", responsibility: "Stewards department funds, budget planning, and resources with clarity and care." },
   { name: "Khemuel Timkang", role: "Auditor", course: "BSIT · 4th Year", responsibility: "Maintains transparency and conducts audits for all department activities.", profile_photo: "/officers/timkang_profile.jpg", action_photo: "/officers/timkang_action.jpg" },
   { name: "Von Dimaculangan", role: "P.R.O.", course: "BSIT · 4th Year", responsibility: "Manages public relations, announcements, and external communications." },
@@ -72,9 +72,9 @@ export const officers = [
   { name: "Lance Alvarez Ceasar", role: "Content Manager", course: "BSIT · 4th Year", responsibility: "Curates, edits, and designs creative digital media content for the department." },
   { name: "JD Pagkatipunan", role: "Head of Sports", course: "BSIT · 4th Year", responsibility: "Organizes sports fests, computing e-sports, and physical fitness activities.", profile_photo: "/officers/pagkatipunan_profile.jpg", action_photo: "/officers/pagkatipunan_action.jpg" },
   { name: "Rick Paolo Suero", role: "4th Yr Representative", course: "BSIT · 4th Year", responsibility: "Represents the senior class, assisting fourth-year students with graduation requirements.", profile_photo: "/officers/suero_profile.jpg", action_photo: "/officers/suero_action.jpg" },
-  { name: "Kenneth Fernandez", role: "3rd Yr Representative", course: "BSIT · 4th Year", responsibility: "Coordinates with third-year class sections for department events and workshops.", profile_photo: "/officers/fernandez_profile.jpg", action_photo: "/officers/fernandez_action.jpg" },
-  { name: "Ruth Geras", role: "2nd Yr Representative", course: "BSIT · 4th Year", responsibility: "Coordinates with second-year class sections and supports peer learning circles.", profile_photo: "/officers/geras_profile.jpg", action_photo: "/officers/geras_action.jpg" },
-  { name: "Jam Morales", role: "1st Yr Representative", course: "BSIT · 4th Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community.", profile_photo: "/officers/morales_profile.png", action_photo: "/officers/morales_action.png" },
+  { name: "Kenneth Fernandez", role: "3rd Yr Representative", course: "BSIT · 3rd Year", responsibility: "Coordinates with third-year class sections for department events and workshops.", profile_photo: "/officers/fernandez_profile.jpg", action_photo: "/officers/fernandez_action.jpg" },
+  { name: "Ruth Geras", role: "2nd Yr Representative", course: "BSIT · 2nd Year", responsibility: "Coordinates with second-year class sections and supports peer learning circles.", profile_photo: "/officers/geras_profile.jpg", action_photo: "/officers/geras_action.jpg" },
+  { name: "Jam Morales", role: "1st Yr Representative", course: "BSIT · 1st Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community.", profile_photo: "/officers/morales_profile.png", action_photo: "/officers/morales_action.png" },
 ];
 
 export const seo = {
