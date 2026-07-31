@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, Button, Modal, Select, PageHeader, SearchInput, EmptyState, Alert } from "../../app/components/ui";
-import { getAllUsers, deleteUser, isUserOnline } from "../../store";
+import { getAllUsers, deleteUser, isUserOnline, updateProfile } from "../../store";
 import { OFFICER_POSITIONS, type User } from "../../types";
 import { ProfileService } from "../../services/profile.service";
 
@@ -38,7 +38,6 @@ export function StudentManagementPage() {
   const handleOfficerChange = async (userId: string, position: string) => {
     const targetUser = users.find((u) => u.id === userId);
     if (!targetUser) return;
-    const previousPosition = targetUser.officer_position || "None";
     const newPositionValue = position === "None" ? "" : position;
 
     // 1. Optimistic UI update
@@ -47,18 +46,11 @@ export function StudentManagementPage() {
     );
     setErrorMsg(null);
 
-    // 2. Send minimal clean payload with ONLY officer_position
-    const result = await ProfileService.update(userId, {
-      officer_position: newPositionValue,
-    });
+    // 2. Sync to central store, session cache & Supabase
+    updateProfile(userId, { officer_position: newPositionValue });
 
-    if (result.success) {
-      setToast(`Updated officer position for ${targetUser.full_name} to "${position}".`);
-      setTimeout(() => setToast(null), 3000);
-    } else {
-      // Keep optimistic UI but notify user if DB column needs to be created
-      console.warn("Officer position update notice:", result.error);
-    }
+    setToast(`Updated officer position for ${targetUser.full_name} to "${position}".`);
+    setTimeout(() => setToast(null), 3000);
   };
 
   const filtered = useMemo(() => {
