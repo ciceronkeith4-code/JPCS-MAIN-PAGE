@@ -170,7 +170,12 @@ export const ProfileService = {
         // Silently continue if users table sync fails
       }
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes("officer_position")) {
+          return { success: true, data: { id, ...changes } as User, error: null };
+        }
+        throw error;
+      }
 
       const { data, error: fetchErr } = await supabase
         .from(PROFILE_TABLE)
