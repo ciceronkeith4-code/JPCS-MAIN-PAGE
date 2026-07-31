@@ -47,18 +47,21 @@ export function StudentManagementPage() {
     );
     setErrorMsg(null);
 
-    // 2. Persist to Supabase
-    const result = await ProfileService.updateForAdmin(userId, {
+    // 2. Build clean payload omitting empty photo strings so Supabase never errors on missing photo columns
+    const payload: any = {
       full_name: targetUser.full_name,
-      student_number: targetUser.student_number,
-      course: targetUser.course,
-      year_level: targetUser.year_level,
+      student_number: targetUser.student_number || "",
+      course: targetUser.course || "BSIT",
+      year_level: targetUser.year_level || "1",
       officer_position: newPositionValue,
-      role: targetUser.role,
-      profile_photo: targetUser.profile_photo || "",
-      action_photo: targetUser.action_photo || "",
+      role: targetUser.role || "student",
       status: targetUser.status || "active",
-    });
+    };
+    if (targetUser.profile_photo) payload.profile_photo = targetUser.profile_photo;
+    if (targetUser.action_photo) payload.action_photo = targetUser.action_photo;
+
+    // 3. Persist to Supabase
+    const result = await ProfileService.updateForAdmin(userId, payload);
 
     if (result.success && result.data) {
       setToast(`Updated officer position for ${targetUser.full_name} to "${position}".`);
