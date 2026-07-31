@@ -449,7 +449,12 @@ export async function refreshSessionFromSupabase(supabaseUser?: SupabaseUser): P
     
     const { error: insertError } = await supabase
       .from("profiles")
-      .insert(newProfileDb);
+      .upsert(newProfileDb);
+
+    await supabase
+      .from("users")
+      .upsert(newProfileDb)
+      .catch(() => undefined);
 
     if (insertError) {
       console.error("Error creating profile in Supabase:", insertError);

@@ -18,32 +18,48 @@ export const ProfileService = {
         return { success: false, data: null, error: "No authenticated user found." };
       }
 
-      // Check user role via profiles
-      const { data: currentProfile, error: profileError } = await supabase
+      // Query profiles table
+      const { data: profilesData } = await supabase
         .from(PROFILE_TABLE)
-        .select("role")
-        .eq("id", currentUser.id)
-        .single();
+        .select("*");
 
-      if (profileError || !currentProfile) {
-        return { success: false, data: null, error: "Unable to verify admin status." };
+      // Also query users table for complete cross-compatibility
+      const { data: usersData } = await supabase
+        .from("users")
+        .select("*");
+
+      const mergedMap = new Map<string, User>();
+
+      if (usersData) {
+        for (const row of usersData) {
+          mergedMap.set(row.id, {
+            id: row.id,
+            uid: row.id,
+            full_name: row.full_name || "",
+            student_number: row.student_number || "",
+            course: row.course || "BSIT",
+            year_level: row.year_level || "1",
+            role: (row.role as any) || "student",
+            email: row.email || "",
+            status: row.status || "active",
+          } as User);
+        }
       }
 
-      if (currentProfile.role !== "admin") {
-        const current = await this.fetchById(currentUser.id);
-        return current.success && current.data
-          ? { success: true, data: [current.data], error: null }
-          : { success: false, data: null, error: current.error };
+      if (profilesData) {
+        for (const row of profilesData) {
+          mergedMap.set(row.id, {
+            ...mergedMap.get(row.id),
+            ...row,
+            id: row.id,
+            uid: row.id,
+          } as User);
+        }
       }
 
-      const { data, error } = await supabase
-        .from(PROFILE_TABLE)
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      debug("Admin profile list loaded", { count: data.length });
-      return { success: true, data: data as User[], error: null };
+      const result = Array.from(mergedMap.values());
+      debug("Combined profile & user list loaded", { count: result.length });
+      return { success: true, data: result, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to load profiles." };
     }
@@ -51,15 +67,36 @@ export const ProfileService = {
 
   async fetchById(id: string): Promise<ApiResponse<User>> {
     try {
-      const { data, error } = await supabase
+      const { data: profile } = await supabase
         .from(PROFILE_TABLE)
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) return { success: false, data: null, error: "Profile not found." };
-      debug("Profile row loaded", { profileId: data.id });
-      return { success: true, data: data as User, error: null };
+      const { data: userRow } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (!profile && !userRow) return { success: false, data: null, error: "Profile not found." };
+
+      const merged: User = {
+        id: id,
+        uid: id,
+        full_name: profile?.full_name || userRow?.full_name || "",
+        student_number: profile?.student_number || userRow?.student_number || "",
+        course: profile?.course || userRow?.course || "BSIT",
+        year_level: profile?.year_level || userRow?.year_level || "1",
+        role: profile?.role || userRow?.role || "student",
+        email: profile?.email || userRow?.email || "",
+        status: profile?.status || userRow?.status || "active",
+        profile_photo: profile?.profile_photo,
+        action_photo: profile?.action_photo,
+        officer_position: profile?.officer_position,
+      };
+
+      return { success: true, data: merged, error: null };
     } catch (err: any) {
       return { success: false, data: null, error: err?.message || "Unable to load profile." };
     }
@@ -115,6 +152,12 @@ export const ProfileService = {
         .update({ ...changes, updated_at: new Date().toISOString() })
         .eq("id", id);
 
+      await supabase
+        .from("users")
+        .update({ ...changes, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .catch(() => undefined);
+
       if (error) throw error;
 
       const { data, error: fetchErr } = await supabase
@@ -133,20 +176,16 @@ export const ProfileService = {
   async updateForAdmin(targetUserId: string, changes: AdminProfileUpdate): Promise<ApiResponse<User>> {
     debug("Submitting admin profile update", { targetUserId, fields: Object.keys(changes) });
     try {
-      const { data: targetProfile, error: targetError } = await supabase
-        .from(PROFILE_TABLE)
-        .select("email")
-        .eq("id", targetUserId)
-        .single();
-
-      if (targetError || !targetProfile) {
-        return { success: false, data: null, error: "Profile not found." };
-      }
-
       const { error } = await supabase
         .from(PROFILE_TABLE)
         .update({ ...changes, updated_at: new Date().toISOString() })
         .eq("id", targetUserId);
+
+      await supabase
+        .from("users")
+        .update({ ...changes, updated_at: new Date().toISOString() })
+        .eq("id", targetUserId)
+        .catch(() => undefined);
 
       if (error) throw error;
 

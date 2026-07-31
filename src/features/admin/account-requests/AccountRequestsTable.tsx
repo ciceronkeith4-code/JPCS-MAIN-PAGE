@@ -66,16 +66,21 @@ export function AccountRequestsTable() {
       const createdUserUid = signUpData.user?.id;
       if (!createdUserUid) throw new Error("Could not create auth account for student.");
 
-      const { supabase } = await import("../../../lib/supabaseClient");
-      await supabase.from("profiles").update({
+      const profilePayload = {
+        id: createdUserUid,
         full_name: acceptingReq.fullName.trim(),
         student_number: acceptingReq.studentNumber.trim(),
         course: "BSIT",
         year_level: acceptingReq.year,
         role: "student",
+        email: acceptingReq.email.trim().toLowerCase(),
         status: "active",
         mustChangePassword: true,
-      }).eq("id", createdUserUid);
+      };
+
+      const { supabase } = await import("../../../lib/supabaseClient");
+      await supabase.from("profiles").upsert(profilePayload);
+      await supabase.from("users").upsert(profilePayload).catch(() => undefined);
 
       await AccountRequestService.updateRequestStatus(acceptingReq.requestId, "approved", {
         reviewedBy: "Admin",
