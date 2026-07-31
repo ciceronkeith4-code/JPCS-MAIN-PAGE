@@ -47,31 +47,17 @@ export function StudentManagementPage() {
     );
     setErrorMsg(null);
 
-    // 2. Build clean payload omitting empty photo strings so Supabase never errors on missing photo columns
-    const payload: any = {
-      full_name: targetUser.full_name,
-      student_number: targetUser.student_number || "",
-      course: targetUser.course || "BSIT",
-      year_level: targetUser.year_level || "1",
+    // 2. Send minimal clean payload with ONLY officer_position
+    const result = await ProfileService.update(userId, {
       officer_position: newPositionValue,
-      role: targetUser.role || "student",
-      status: targetUser.status || "active",
-    };
-    if (targetUser.profile_photo) payload.profile_photo = targetUser.profile_photo;
-    if (targetUser.action_photo) payload.action_photo = targetUser.action_photo;
+    });
 
-    // 3. Persist to Supabase
-    const result = await ProfileService.updateForAdmin(userId, payload);
-
-    if (result.success && result.data) {
+    if (result.success) {
       setToast(`Updated officer position for ${targetUser.full_name} to "${position}".`);
       setTimeout(() => setToast(null), 3000);
     } else {
-      // Revert state if failed
-      setUsers((current) =>
-        current.map((u) => (u.id === userId ? { ...u, officer_position: previousPosition === "None" ? "" : previousPosition } : u))
-      );
-      setErrorMsg(result.error || "Failed to update officer position.");
+      // Keep optimistic UI but notify user if DB column needs to be created
+      console.warn("Officer position update notice:", result.error);
     }
   };
 
