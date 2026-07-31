@@ -94,7 +94,7 @@ function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: User
 
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 border border-transparent transition-colors"
+        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 border border-transparent transition-colors max-w-full"
       >
         <div className="size-8 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
           {user.profile_photo ? (
@@ -107,12 +107,12 @@ function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: User
             <span className="text-xs font-bold text-slate-600">{initials}</span>
           )}
         </div>
-        <div className="hidden sm:flex flex-col items-start text-left max-w-[190px]">
-          <span className="truncate text-xs font-bold text-slate-900 leading-tight" title={user.full_name}>
+        <div className="hidden sm:flex flex-col items-start text-left min-w-0 max-w-[180px] md:max-w-[220px]">
+          <span className="w-full truncate text-xs font-bold text-slate-900 leading-tight" title={user.full_name}>
             {user.full_name}
           </span>
           <span className={cn(
-            "text-[10px] font-bold truncate leading-none mt-0.5 px-1.5 py-0.5 rounded border",
+            "text-[10px] font-bold truncate leading-none mt-1 px-1.5 py-0.5 rounded border max-w-full",
             isOfficer
               ? "bg-amber-50 text-amber-900 border-amber-200/80"
               : user.role === "admin"
@@ -123,7 +123,7 @@ function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: User
           </span>
         </div>
         <svg
-          className={cn("size-3.5 text-slate-400 shrink-0 transition-transform duration-150 hidden sm:block", open && "rotate-180")}
+          className={cn("size-3.5 text-slate-400 shrink-0 ml-0.5 transition-transform duration-150 hidden sm:block", open && "rotate-180")}
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
