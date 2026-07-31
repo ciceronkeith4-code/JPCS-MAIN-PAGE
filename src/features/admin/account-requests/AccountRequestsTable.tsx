@@ -80,11 +80,6 @@ export function AccountRequestsTable() {
 
       const { supabase } = await import("../../../lib/supabaseClient");
       await supabase.from("profiles").upsert(profilePayload);
-      try {
-        await supabase.from("users").upsert(profilePayload);
-      } catch {
-        // Silently continue if users table sync fails
-      }
 
       await AccountRequestService.updateRequestStatus(acceptingReq.requestId, "approved", {
         reviewedBy: "Admin",

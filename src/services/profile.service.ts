@@ -161,14 +161,6 @@ export const ProfileService = {
         .update({ ...changes, updated_at: new Date().toISOString() })
         .eq("id", id);
 
-      try {
-        await supabase
-          .from("users")
-          .update({ ...changes, updated_at: new Date().toISOString() })
-          .eq("id", id);
-      } catch {
-        // Silently continue if users table sync fails
-      }
 
       if (error) {
         if (error.message?.includes("officer_position")) {
@@ -219,14 +211,6 @@ export const ProfileService = {
         error = retry.error;
       }
 
-      try {
-        await supabase
-          .from("users")
-          .update(cleanPayload)
-          .eq("id", targetUserId);
-      } catch {
-        // Silently continue if users table sync fails
-      }
 
       if (error) throw error;
 
