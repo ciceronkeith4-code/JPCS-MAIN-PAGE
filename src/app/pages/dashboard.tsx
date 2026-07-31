@@ -204,7 +204,7 @@ function DashboardCalendar({
       {/* Selected Day Agenda */}
       <div className="border-t border-slate-100 pt-4 space-y-3">
         <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-          <span>📅</span> Agenda for {new Date(selectedDateStr).toLocaleDateString("en-US", { dateStyle: "long" })}
+          Agenda for {new Date(selectedDateStr).toLocaleDateString("en-US", { dateStyle: "long" })}
         </h4>
         {selectedEvents.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -228,8 +228,8 @@ function DashboardCalendar({
                 </div>
                 {evt.type === "class" && (
                   <div className="mt-2.5 pt-2 border-t border-sky-100/50 flex flex-wrap justify-between gap-1.5 text-[10px] text-slate-500 font-bold">
-                    <span>⏰ {evt.time}</span>
-                    <span>📍 {evt.room}</span>
+                    <span>{evt.time}</span>
+                    <span>{evt.room}</span>
                   </div>
                 )}
               </div>
@@ -394,16 +394,16 @@ export function DashboardPage({ user }: { user: User }) {
               <span className="text-xs bg-green-50 text-green-700 font-extrabold px-2 py-0.5 rounded border border-green-200">✓ Verified</span>
             )}
             {user.officer_position && user.officer_position !== "None" && user.officer_position !== "" ? (
-              <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-black shadow-2xs">
-                👑 Officer: {user.officer_position}
+              <span className="text-xs bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold shadow-2xs">
+                Officer: {user.officer_position}
               </span>
             ) : user.role === "admin" ? (
               <span className="text-xs bg-purple-100 text-purple-900 border border-purple-300 px-2.5 py-0.5 rounded-full font-bold">
-                ⚡ Admin Staff
+                Admin Staff
               </span>
             ) : (
-              <span className="text-xs bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full font-bold">
-                🎓 Student
+              <span className="text-xs bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full font-semibold">
+                Student
               </span>
             )}
           </div>

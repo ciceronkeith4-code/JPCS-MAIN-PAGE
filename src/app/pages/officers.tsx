@@ -59,8 +59,8 @@ function OfficerPhotoCard({ officer, index }: { officer: User; index: number }) 
                 <span className="text-xs bg-green-100 text-green-800 font-black px-1.5 py-0.5 rounded border border-green-200">Verified</span>
               )}
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-1 flex items-center gap-1">
-              <span>🏫</span> San Sebastian College Recoletos-Manila
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              San Sebastian College Recoletos-Manila
             </p>
           </div>
 

@@ -25,6 +25,7 @@ const CurriculumPage = lazy(() => import("../../pages/admin/CurriculumPage").the
 const AwardSettingsPage = lazy(() => import("../../pages/admin/AwardSettingsPage").then((module) => ({ default: module.AwardSettingsPage })));
 const AnnouncementsPage = lazy(() => import("../../pages/admin/AnnouncementsPage").then((module) => ({ default: module.AnnouncementsPage })));
 const AccountRequestsPage = lazy(() => import("../../pages/admin/AccountRequestsPage").then((module) => ({ default: module.AccountRequestsPage })));
+const OfficersPage = lazy(() => import("../pages/officers").then((module) => ({ default: module.OfficersPage })));
 
 export function PageSkeleton() {
   return (
@@ -86,6 +87,7 @@ export function AppRouter({ user, onLogout, onUpdateUser }: AppRouterProps) {
               <Route path={ROUTES.SIMULATOR} element={<SimulatorPage user={user!} />} />
               <Route path={ROUTES.STATISTICS} element={<StatisticsPage user={user!} />} />
               <Route path={ROUTES.PROFILE} element={<ProfilePage user={user!} onUpdate={onUpdateUser} />} />
+              <Route path="/officers" element={<OfficersPage user={user!} />} />
               <Route path="/members" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
               <Route path="/events" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
             </Route>
@@ -94,6 +96,7 @@ export function AppRouter({ user, onLogout, onUpdateUser }: AppRouterProps) {
               <Route path={ROUTES.ADMIN.DASHBOARD} element={<AdminDashboardPage />} />
               <Route path={ROUTES.ADMIN.ACCOUNT_REQUESTS} element={<AccountRequestsPage />} />
               <Route path={ROUTES.ADMIN.STUDENTS} element={<StudentManagementPage />} />
+              <Route path="/admin/officers" element={<OfficersPage user={user!} />} />
               <Route path={ROUTES.ADMIN.CURRICULUM} element={<CurriculumPage />} />
               <Route path={ROUTES.ADMIN.AWARDS} element={<AwardSettingsPage />} />
               <Route path={ROUTES.ADMIN.ANNOUNCEMENTS} element={<AnnouncementsPage />} />
