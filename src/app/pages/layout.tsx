@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, Link } from "react-router-dom";
 import { cn } from "../components/ui";
-import { getAnnouncements, getSemesters, getSubjects } from "../store";
+import { getAnnouncements } from "../store";
 import type { User } from "../../types";
 
 const STUDENT_NAV = [
@@ -82,6 +82,7 @@ interface UserDropdownProps {
 
 function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: UserDropdownProps) {
   const [open, setOpen] = useState(false);
+  const isOfficer = Boolean(user.officer_position && user.officer_position !== "None" && user.officer_position !== "");
 
   return (
     <div className="relative">
@@ -91,9 +92,9 @@ function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: User
 
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 border border-transparent transition-colors"
+        className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-slate-100 border border-transparent transition-colors"
       >
-        <div className="size-7 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
+        <div className="size-8 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
           {user.profile_photo ? (
             <img
               src={user.profile_photo}
@@ -104,7 +105,21 @@ function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: User
             <span className="text-xs font-bold text-slate-600">{initials}</span>
           )}
         </div>
-        <p className="hidden max-w-[180px] truncate text-sm font-medium text-slate-700 sm:block" title={user.full_name}>{user.full_name}</p>
+        <div className="hidden sm:flex flex-col items-start text-left max-w-[190px]">
+          <span className="truncate text-xs font-bold text-slate-900 leading-tight" title={user.full_name}>
+            {user.full_name}
+          </span>
+          <span className={cn(
+            "text-[10px] font-extrabold truncate leading-none mt-0.5 px-1.5 py-0.5 rounded border",
+            isOfficer
+              ? "bg-amber-50 text-amber-900 border-amber-200/80"
+              : user.role === "admin"
+              ? "bg-purple-50 text-purple-900 border-purple-200/80"
+              : "bg-slate-100 text-slate-600 border-slate-200/80"
+          )}>
+            {isOfficer ? `Officer: ${user.officer_position}` : user.role === "admin" ? "Admin" : "Student"}
+          </span>
+        </div>
         <svg
           className={cn("size-3.5 text-slate-400 shrink-0 transition-transform duration-150 hidden sm:block", open && "rotate-180")}
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -114,10 +129,22 @@ function UserDropdown({ user, isAdmin, onLogout, logoutLoading, initials }: User
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-1.5 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-md overflow-hidden">
+        <div className="absolute top-full right-0 mt-1.5 z-50 w-60 bg-white border border-slate-200 rounded-xl shadow-md overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
             <p className="text-sm font-semibold text-slate-800">{user.full_name}</p>
             <p className="text-xs text-slate-500 truncate">{user.email ?? user.student_number}</p>
+            <div className="mt-2">
+              <span className={cn(
+                "inline-block text-[10px] font-extrabold px-2 py-0.5 rounded border",
+                isOfficer
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : user.role === "admin"
+                  ? "bg-purple-100 text-purple-900 border-purple-300"
+                  : "bg-slate-100 text-slate-700 border-slate-200"
+              )}>
+                {isOfficer ? `👑 JPCS Officer: ${user.officer_position}` : user.role === "admin" ? "⚡ Admin Staff" : "🎓 Student"}
+              </span>
+            </div>
           </div>
           <div className="py-1">
             <Link
@@ -161,6 +188,7 @@ export function AppLayout({ user, onLogout, isAdmin }: AppLayoutProps) {
   const [logoutError, setLogoutError] = useState("");
   const isActualAdmin = isAdmin ?? (user.role === "admin");
   const nav = isActualAdmin ? ADMIN_NAV : STUDENT_NAV;
+  const isOfficer = Boolean(user.officer_position && user.officer_position !== "None" && user.officer_position !== "");
 
   const handleLogout = async () => {
     if (logoutLoading) return;
@@ -277,7 +305,7 @@ export function AppLayout({ user, onLogout, isAdmin }: AppLayoutProps) {
               </div>
             </div>
 
-            {/* Academic details */}
+            {/* Role & Officer Position display */}
             <div className="text-[11px] text-slate-600 border-t border-slate-100 pt-2 space-y-1">
               {user.role === "admin" ? (
                 <div className="flex justify-between">
@@ -298,12 +326,21 @@ export function AppLayout({ user, onLogout, isAdmin }: AppLayoutProps) {
                   )}
                 </>
               )}
-              {user.officer_position && user.officer_position !== "None" && (
-                <div className="flex justify-between items-center bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 mt-1">
-                  <span className="text-amber-800 text-[10px] font-bold">Officer:</span>
-                  <span className="text-amber-900 text-[10px] font-black">{user.officer_position}</span>
-                </div>
-              )}
+
+              {/* Prominent Officer / Student Role Badge */}
+              <div className={cn(
+                "flex justify-between items-center rounded px-2 py-1 mt-1 border",
+                isOfficer
+                  ? "bg-amber-50 border-amber-200 text-amber-900"
+                  : user.role === "admin"
+                  ? "bg-purple-50 border-purple-200 text-purple-900"
+                  : "bg-slate-100 border-slate-200 text-slate-700"
+              )}>
+                <span className="text-[10px] font-bold">Role / Position:</span>
+                <span className="text-[10px] font-black truncate max-w-[110px]">
+                  {isOfficer ? `Officer: ${user.officer_position}` : user.role === "admin" ? "Admin Staff" : "Student"}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -424,12 +461,19 @@ export function AppLayout({ user, onLogout, isAdmin }: AppLayoutProps) {
                         )}
                       </>
                     )}
-                    {user.officer_position && user.officer_position !== "None" && (
-                      <div className="flex justify-between items-center bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 mt-1">
-                        <span className="text-amber-800 text-[10px] font-bold">Officer:</span>
-                        <span className="text-amber-900 text-[10px] font-black">{user.officer_position}</span>
-                      </div>
-                    )}
+                    <div className={cn(
+                      "flex justify-between items-center rounded px-2 py-1 mt-1 border",
+                      isOfficer
+                        ? "bg-amber-50 border-amber-200 text-amber-900"
+                        : user.role === "admin"
+                        ? "bg-purple-50 border-purple-200 text-purple-900"
+                        : "bg-slate-100 border-slate-200 text-slate-700"
+                    )}>
+                      <span className="text-[10px] font-bold">Role / Position:</span>
+                      <span className="text-[10px] font-black truncate max-w-[110px]">
+                        {isOfficer ? `Officer: ${user.officer_position}` : user.role === "admin" ? "Admin Staff" : "Student"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
