@@ -412,6 +412,7 @@ export function SubjectsPage({ user }: { user: User }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Block</th>
                       <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Code</th>
                       <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Subject Name</th>
                       <th className="text-center text-xs font-medium text-muted-foreground px-5 py-3">Units</th>
@@ -423,45 +424,63 @@ export function SubjectsPage({ user }: { user: User }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {subjects.map((sub) => (
-                      <tr key={sub.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
-                        <td className="px-5 py-3.5 font-mono text-xs text-muted-foreground">{sub.subject_code}</td>
-                        <td className="px-5 py-3.5 text-foreground font-medium">{sub.subject_name}</td>
-                        <td className="px-5 py-3.5 text-center text-muted-foreground">{sub.units}</td>
-                        <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">{sub.schedule_days || ""}</td>
-                        <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">{sub.schedule_time || ""}</td>
-                        <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">{sub.room || ""}</td>
-                        <td className="px-5 py-3.5 text-center">
-                          {sub.status === "Currently Taking" ? (
-                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                              Taking
+                    {subjects.map((sub) => {
+                      const block = sub.block || "A";
+                      const isB = block === "B";
+                      const isAB = block === "AB";
+                      return (
+                        <tr key={sub.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors font-medium">
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
+                              isB ? "bg-purple-100 text-purple-900 border-purple-300" :
+                              isAB ? "bg-amber-100 text-amber-950 border-amber-300" :
+                              "bg-blue-100 text-blue-900 border-blue-300"
+                            }`}>
+                              BLK {block}
                             </span>
-                          ) : sub.status === "Waiting" ? (
-                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
-                              Waiting
+                          </td>
+                          <td className="px-5 py-3.5 font-mono text-xs font-bold">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-900 border border-slate-200">
+                              {sub.subject_code}
                             </span>
-                          ) : (
-                            <span className={`inline-flex items-center justify-center w-14 py-1 rounded-md text-xs font-bold tabular-nums ${
-                              sub.grade >= 95 ? "bg-indigo-600 text-white" :
-                              sub.grade >= 90 ? "bg-emerald-600 text-white" :
-                              sub.grade >= 85 ? "bg-amber-500 text-white" :
-                              sub.grade >= 75 ? "bg-slate-500 text-white" :
-                              "bg-red-600 text-white"
-                            }`}>{sub.grade}</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => openEdit(sub.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                              <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                            </button>
-                            <button onClick={() => setDeleting(sub.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
-                              <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-5 py-3.5 text-foreground font-bold">{sub.subject_name}</td>
+                          <td className="px-5 py-3.5 text-center text-muted-foreground font-bold">{sub.units}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">{sub.schedule_days || "—"}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">{sub.schedule_time || "—"}</td>
+                          <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">{sub.room || "—"}</td>
+                          <td className="px-5 py-3.5 text-center">
+                            {sub.status === "Currently Taking" ? (
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                Taking
+                              </span>
+                            ) : sub.status === "Waiting" ? (
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200">
+                                Waiting
+                              </span>
+                            ) : (
+                              <span className={`inline-flex items-center justify-center w-14 py-1 rounded-md text-xs font-bold tabular-nums ${
+                                sub.grade >= 95 ? "bg-indigo-600 text-white" :
+                                sub.grade >= 90 ? "bg-emerald-600 text-white" :
+                                sub.grade >= 85 ? "bg-amber-500 text-white" :
+                                sub.grade >= 75 ? "bg-slate-500 text-white" :
+                                "bg-red-600 text-white"
+                              }`}>{sub.grade}</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => openEdit(sub.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                                <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                              <button onClick={() => setDeleting(sub.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                                <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

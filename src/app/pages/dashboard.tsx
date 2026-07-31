@@ -59,7 +59,7 @@ function DashboardCalendar({
   };
 
   const getEventsForDate = (dateStr: string) => {
-    const result: Array<{ title: string; desc?: string; type: "event" | "class"; time?: string; room?: string }> = [];
+    const result: Array<{ title: string; desc?: string; type: "event" | "class"; time?: string; room?: string; block?: string }> = [];
     
     if (dateStr === classStartDate) {
       result.push({
@@ -91,6 +91,7 @@ function DashboardCalendar({
           type: "class",
           time: c.time,
           room: c.room,
+          block: c.block || "A",
         });
       });
     }
@@ -178,9 +179,14 @@ function DashboardCalendar({
                     <div
                       key={`${event.desc}-${index}`}
                       className="rounded-md border border-sky-100 bg-sky-50 px-1.5 py-1 text-sky-900"
-                      title={`${event.title} · ${event.time} · ${event.room}`}
+                      title={`${event.title} · BLK ${event.block || "A"} · ${event.time} · ${event.room}`}
                     >
-                      <span className="block truncate text-[9px] font-extrabold leading-tight">{event.desc}</span>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="block truncate text-[9px] font-extrabold leading-tight">{event.desc}</span>
+                        <span className="text-[7.5px] font-black px-1 rounded bg-sky-200/90 text-sky-950 shrink-0">
+                          BLK {event.block || "A"}
+                        </span>
+                      </div>
                       <span className="block truncate text-[8px] font-semibold leading-tight text-sky-700">{event.time}</span>
                     </div>
                   ))}
@@ -219,7 +225,14 @@ function DashboardCalendar({
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="font-extrabold leading-tight">{evt.title}</span>
+                    <span className="font-extrabold leading-tight flex items-center gap-1.5 flex-wrap">
+                      {evt.title}
+                      {evt.type === "class" && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-sky-200/80 text-sky-950 border border-sky-300">
+                          BLK {evt.block || "A"}
+                        </span>
+                      )}
+                    </span>
                     <Badge variant={evt.type === "event" ? "destructive" : "default"} className="text-[9px] px-1.5 py-0.5 shrink-0">
                       {evt.type === "event" ? "Academic Event" : "Class"}
                     </Badge>
@@ -227,9 +240,9 @@ function DashboardCalendar({
                   {evt.desc && <p className="text-slate-500 font-medium text-[11px] leading-normal">{evt.desc}</p>}
                 </div>
                 {evt.type === "class" && (
-                  <div className="mt-2.5 pt-2 border-t border-sky-100/50 flex flex-wrap justify-between gap-1.5 text-[10px] text-slate-500 font-bold">
-                    <span>{evt.time}</span>
-                    <span>{evt.room}</span>
+                  <div className="mt-2.5 pt-2 border-t border-sky-100/50 flex flex-wrap justify-between gap-1.5 text-[10px] text-slate-600 font-bold">
+                    <span>Time: {evt.time}</span>
+                    <span>Room: {evt.room}</span>
                   </div>
                 )}
               </div>

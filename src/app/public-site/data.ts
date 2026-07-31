@@ -74,7 +74,7 @@ export const officers = [
   { name: "Rick Paolo Suero", role: "4th Yr Representative", course: "BSIT · 4th Year", responsibility: "Represents the senior class, assisting fourth-year students with graduation requirements.", profile_photo: "/officers/suero_profile.jpg", action_photo: "/officers/suero_action.jpg" },
   { name: "Kenneth Fernandez", role: "3rd Yr Representative", course: "BSIT · 3rd Year", responsibility: "Coordinates with third-year class sections for department events and workshops.", profile_photo: "/officers/fernandez_profile.jpg", action_photo: "/officers/fernandez_action.jpg" },
   { name: "Ruth Geras", role: "2nd Yr Representative", course: "BSIT · 2nd Year", responsibility: "Coordinates with second-year class sections and supports peer learning circles.", profile_photo: "/officers/geras_profile.jpg", action_photo: "/officers/geras_action.jpg" },
-  { name: "Jam Morales", role: "1st Yr Representative", course: "BSIT · 1st Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community.", profile_photo: "/officers/morales_profile.png", action_photo: "/officers/morales_action.png" },
+  { name: "Jam Ciceron", role: "1st Yr Representative", course: "BSIT · 1st Year", responsibility: "Assists incoming freshmen in adjusting to the IT department community.", profile_photo: "/officers/morales_profile.png", action_photo: "/officers/morales_action.png" },
 ];
 
 export const seo = {
