@@ -1,0 +1,22 @@
+export const ROUTES = {
+  HOME: "/",
+  PROGRAMS: "/programs",
+  COMMUNITY: "/community",
+  ABOUT: "/about",
+  TESTIMONIALS: "/testimonials",
+  LOGIN: "/login",
+  CHANGE_PASSWORD: "/change-password",
+  DASHBOARD: "/dashboard",
+  SEMESTERS: "/semesters",
+  SIMULATOR: "/simulator",
+  STATISTICS: "/statistics",
+  PROFILE: "/profile",
+  ADMIN: {
+    DASHBOARD: "/admin",
+    ACCOUNT_REQUESTS: "/admin/account-requests",
+    STUDENTS: "/admin/students",
+    CURRICULUM: "/admin/curriculum",
+    AWARDS: "/admin/awards",
+    ANNOUNCEMENTS: "/admin/announcements",
+  },
+} as const;

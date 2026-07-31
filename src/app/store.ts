@@ -534,7 +534,7 @@ export function updateProfile(id: string, data: Partial<User>) {
   if (isSupabaseConfigured()) {
     ProfileService.update(id, data).then((res) => {
       if (!res.success) {
-        console.warn("Profile update warning in Firebase:", res.error);
+        console.warn("Profile update warning in Supabase:", res.error);
       }
       // Always re-sync from DB to confirm changes persisted
       syncFromSupabase().catch(console.error);
@@ -562,12 +562,12 @@ export function addSemester(data: Omit<Semester, "id">): Semester {
   if (isSupabaseConfigured()) {
     SemesterService.add(sem).then((res) => {
       if (!res.success) {
-        console.warn("Semester add warning in Firebase:", res.error);
+        console.warn("Semester add warning in Supabase:", res.error);
         saveCache(KEYS.semesters, all);
         window.dispatchEvent(new Event("sscr_store_synced"));
       }
     }).catch((err) => {
-      console.warn("Semester add error in Firebase:", err);
+      console.warn("Semester add error in Supabase:", err);
       saveCache(KEYS.semesters, all);
       window.dispatchEvent(new Event("sscr_store_synced"));
     });
@@ -667,7 +667,7 @@ export function updateSemester(id: string, data: Partial<Semester>) {
   if (isSupabaseConfigured()) {
     SemesterService.update(id, data).then((res) => {
       if (!res.success) {
-        console.warn("Semester update warning in Firebase:", res.error);
+        console.warn("Semester update warning in Supabase:", res.error);
         saveCache(KEYS.semesters, all);
         window.dispatchEvent(new Event("sscr_store_synced"));
       }
@@ -688,7 +688,7 @@ export function deleteSemester(id: string) {
   if (isSupabaseConfigured()) {
     SemesterService.delete(id).then((res) => {
       if (!res.success) {
-        console.warn("Semester delete warning in Firebase:", res.error);
+        console.warn("Semester delete warning in Supabase:", res.error);
         saveCache(KEYS.semesters, allSems);
         saveCache(KEYS.subjects, allSubs);
         window.dispatchEvent(new Event("sscr_store_synced"));
@@ -740,7 +740,7 @@ export function addSubject(data: Omit<Subject, "id">): Subject {
   if (isSupabaseConfigured()) {
     SubjectService.add(sub).then((res) => {
       if (!res.success) {
-        console.warn("Subject add warning in Firebase:", res.error);
+        console.warn("Subject add warning in Supabase:", res.error);
         saveCache(KEYS.subjects, all);
         window.dispatchEvent(new Event("sscr_store_synced"));
       }
@@ -760,7 +760,7 @@ export function updateSubject(id: string, data: Partial<Subject>) {
   if (isSupabaseConfigured()) {
     SubjectService.update(id, data).then((res) => {
       if (!res.success) {
-        console.warn("Subject update warning in Firebase:", res.error);
+        console.warn("Subject update warning in Supabase:", res.error);
         saveCache(KEYS.subjects, all);
         window.dispatchEvent(new Event("sscr_store_synced"));
       }
@@ -778,7 +778,7 @@ export function deleteSubject(id: string) {
   if (isSupabaseConfigured()) {
     SubjectService.delete(id).then((res) => {
       if (!res.success) {
-        console.warn("Subject delete warning in Firebase:", res.error);
+        console.warn("Subject delete warning in Supabase:", res.error);
         saveCache(KEYS.subjects, all);
         window.dispatchEvent(new Event("sscr_store_synced"));
       }
@@ -1000,8 +1000,8 @@ export function deleteUser(id: string) {
   if (isSupabaseConfigured()) {
     ProfileService.delete(id).then((res) => {
       if (!res.success) {
-        console.warn("Profile delete warning in Firebase:", res.error);
-        // Rollback local cache if Firebase rejected the delete
+        console.warn("Profile delete warning in Supabase:", res.error);
+        // Rollback local cache if Supabase rejected the delete
         saveCache(KEYS.users, users);
       }
       // Always re-sync from DB to confirm the delete
