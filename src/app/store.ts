@@ -451,10 +451,11 @@ export async function refreshSessionFromSupabase(supabaseUser?: SupabaseUser): P
       .from("profiles")
       .upsert(newProfileDb);
 
-    await supabase
-      .from("users")
-      .upsert(newProfileDb)
-      .catch(() => undefined);
+    try {
+      await supabase.from("users").upsert(newProfileDb);
+    } catch {
+      // Silently continue if users table sync fails
+    }
 
     if (insertError) {
       console.error("Error creating profile in Supabase:", insertError);

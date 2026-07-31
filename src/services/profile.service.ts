@@ -161,11 +161,14 @@ export const ProfileService = {
         .update({ ...changes, updated_at: new Date().toISOString() })
         .eq("id", id);
 
-      await supabase
-        .from("users")
-        .update({ ...changes, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .catch(() => undefined);
+      try {
+        await supabase
+          .from("users")
+          .update({ ...changes, updated_at: new Date().toISOString() })
+          .eq("id", id);
+      } catch {
+        // Silently continue if users table sync fails
+      }
 
       if (error) throw error;
 
@@ -190,11 +193,14 @@ export const ProfileService = {
         .update({ ...changes, updated_at: new Date().toISOString() })
         .eq("id", targetUserId);
 
-      await supabase
-        .from("users")
-        .update({ ...changes, updated_at: new Date().toISOString() })
-        .eq("id", targetUserId)
-        .catch(() => undefined);
+      try {
+        await supabase
+          .from("users")
+          .update({ ...changes, updated_at: new Date().toISOString() })
+          .eq("id", targetUserId);
+      } catch {
+        // Silently continue if users table sync fails
+      }
 
       if (error) throw error;
 
